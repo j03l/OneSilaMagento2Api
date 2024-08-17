@@ -5,7 +5,7 @@ from . import utils
 from . import exceptions
 import os
 
-__version__ = "2.2.0"
+__version__ = "1.0.0"
 
 Client = clients.Client
 logger = utils.MagentoLogger(
