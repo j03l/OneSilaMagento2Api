@@ -3,8 +3,11 @@ import requests
 from . import Model
 from pathlib import Path
 from functools import cached_property
-from magento.exceptions import MagentoError
-from typing import Union, TYPE_CHECKING, Optional, List, Dict
+from magento.exceptions import MagentoError, InstanceGetFailed
+from typing import Union, TYPE_CHECKING, Optional, List, Dict, Any
+
+from ..constants import ModelMethod
+from ..decorators import data_not_fetched_value, set_private_attr_after_setter
 
 if TYPE_CHECKING:
     from magento import Client
@@ -12,7 +15,6 @@ if TYPE_CHECKING:
 
 
 class Product(Model):
-
     """Wrapper for the ``products`` endpoint"""
 
     STATUS_ENABLED = 1
@@ -25,30 +27,442 @@ class Product(Model):
 
     DOCUMENTATION = 'https://adobe-commerce.redoc.ly/2.3.7-admin/tag/products/'
     IDENTIFIER = 'sku'
+    ALLOWED_METHODS = [ModelMethod.GET, ModelMethod.CREATE, ModelMethod.UPDATE, ModelMethod.DELETE]
 
-    def __init__(self, data: dict, client: Client):
+    def __init__(self, data: dict, client: Client, fetched: bool = False):
         """Initialize a Product object using an API response from the ``products`` endpoint
 
         :param data: the API response from the ``products`` endpoint
         :param client: an initialized :class:`~.Client` object
         """
+        # we do this because if we initialize a product in order to create it there will be missing
         super().__init__(
             data=data,
             client=client,
+            fetched=fetched,
             endpoint='products',
-            private_keys=True
+            private_keys=True,
         )
 
     def __repr__(self):
-        return f'<Magento Product: {self.sku}>'
+        return f"<Magento Product: {self._sku}>"
+
+    # ------------------------------------------------- PROPERTIES
 
     @property
     def excluded_keys(self):
         return ['media_gallery_entries']
 
     @property
+    def required_keys(self):
+        return [self.IDENTIFIER, 'attribute_set_id']
+
+    @property
+    def mutable_keys(self) -> List[str]:
+        return [
+            'name',
+            'attribute_set_id',
+            'price',
+            'special_price',
+            'visibility',
+            'type_id',
+            'status',
+            'backorders',
+            'short_description',
+            'category_ids',
+            'meta_title',
+            'meta_keyword',
+            'meta_description',
+            'url_key',
+        ]
+
+    @property
     def uid(self) -> Union[str, int]:
         return self.encoded_sku
+
+    @property
+    def sku(self) -> str:
+        return self._sku
+
+    @property
+    @data_not_fetched_value(lambda self: {})
+    def stock_item(self) -> dict:
+        """Stock data from the StockItem Interface"""
+        if hasattr(self, 'extension_attributes'):  # Missing if product was retrieved by id
+            if stock_data := self.extension_attributes.get('stock_item', {}):
+                return stock_data
+        # Use the SKU to refresh attributes with full product data
+        self.refresh()
+        return self.stock_item
+
+    @property
+    @data_not_fetched_value(lambda self: None)
+    def stock_item_id(self) -> Optional[int]:
+        """Item id of the StockItem, used to :meth:`~.update_stock`"""
+        if self.stock_item:
+            return self.stock_item['item_id']
+
+    @property
+    @data_not_fetched_value(lambda self: self._special_price)
+    def special_price(self) -> Optional[float]:
+        """The current special (sale) price"""
+        try:
+            return self.custom_attributes.get('special_price')
+        except AttributeError:
+            return None
+
+    @property
+    @data_not_fetched_value(lambda self: None)
+    def thumbnail_link(self) -> Optional[str]:
+        """Link of the product's :attr:`~.thumbnail` image"""
+        if self.thumbnail:
+            return self.thumbnail.link
+
+        return None
+
+    @property
+    def encoded_sku(self) -> str:
+        """URL-encoded SKU, which is used in request endpoints"""
+        return self.encode(self.sku)
+
+    @cached_property
+    @data_not_fetched_value(lambda self: None)
+    def children(self) -> Optional[List[Product]]:
+        """If the Product is a configurable product, returns a list of its child products"""
+        if self.type_id == 'configurable':
+            url = self.client.url_for(f'configurable-products/{self.encoded_sku}/children')
+            if (response := self.client.get(url)).ok:
+                return [self.parse(child) for child in response.json()]
+            else:
+                self.logger.error(f'Failed to get child products of {self}')
+        else:
+            self.logger.info('Only configurable products have child SKUs')
+        return []
+
+    @cached_property
+    @data_not_fetched_value(lambda self: None)
+    def link(self) -> Optional[str]:
+        """Link of the product"""
+        if url_key := self.custom_attributes.get('url_key'):
+            return self.client.store.active.base_url + url_key + '.html'
+
+    @cached_property
+    @data_not_fetched_value(lambda self: [])
+    def categories(self) -> Optional[Category | List[Category]]:
+        """Categories the product is in, returned as a list of :class:`~.Category` objects"""
+        category_ids = self.custom_attributes.get('category_ids', [])
+        return self.client.categories.by_list('entity_id', category_ids)
+
+    @cached_property
+    @data_not_fetched_value(lambda self: [])
+    def media_gallery_entries(self) -> List[MediaEntry]:
+        """The product's media gallery entries, returned as a list of :class:`MediaEntry` objects"""
+        return [MediaEntry(self, entry) for entry in self.__media_gallery_entries]
+
+    @cached_property
+    @data_not_fetched_value(lambda self: None)
+    def thumbnail(self) -> Optional[MediaEntry]:
+        """The :class:`MediaEntry` corresponding to the product's thumbnail"""
+        for entry in self.media_gallery_entries:
+            if entry.is_thumbnail:
+                return entry
+
+    @cached_property
+    @data_not_fetched_value(lambda self: [])
+    def option_skus(self) -> Optional[List[str]]:
+        """The full SKUs for the product's customizable options, if they exist
+
+        .. hint:: When a product with customizable options is ordered, these SKUs are used by the API when
+            retrieving and searching for :class:`~.Order` and :class:`~.OrderItem` data
+        """
+        option_skus = []
+        if hasattr(self, 'options'):
+            for option in self.options:
+                base_sku = option['product_sku']
+                for val in option['values']:
+                    if val.get('sku'):
+                        option_skus.append(base_sku + '-' + val['sku'])
+        return option_skus
+
+    @property
+    def name(self) -> Optional[str]:
+        return self._name
+
+    @property
+    def attribute_set_id(self) -> Optional[int]:
+        return self._attribute_set_id
+
+    @property
+    def price(self) -> Optional[float]:
+        return self._price
+
+    @property
+    def visibility(self) -> Optional[int]:
+        return self._visibility
+
+    @property
+    def type_id(self) -> Optional[str]:
+        return self._type_id
+
+    @property
+    def status(self) -> Optional[int]:
+        return self._status
+
+    @property
+    @data_not_fetched_value(lambda self: self._backorders)
+    def backorders(self) -> Optional[bool]:
+        if self.stock_item:
+            return self.stock_item.get('backorders') == 1
+
+    @property
+    @data_not_fetched_value(lambda self: self._stock)
+    def stock(self) -> int:
+        """Current stock quantity"""
+        if self.stock_item:
+            return self.stock_item['qty']
+
+    @property
+    @data_not_fetched_value(lambda self: self._description)
+    def description(self) -> Optional[str]:
+        """Product description (as HTML)"""
+        try:
+            return self.custom_attributes.get('description', '')
+        except AttributeError:
+            return None
+
+    @property
+    @data_not_fetched_value(lambda self: self._short_description)
+    def short_description(self) -> Optional[str]:
+        try:
+            return self.custom_attributes.get('short_description')
+        except AttributeError:
+            return None
+
+    @property
+    @data_not_fetched_value(lambda self: self._category_ids)
+    def category_ids(self) -> Optional[List[int]]:
+        try:
+            return self.custom_attributes.get('category_ids')
+        except AttributeError:
+            return None
+
+    @property
+    @data_not_fetched_value(lambda self: self._meta_title)
+    def meta_title(self) -> Optional[str]:
+        try:
+            return self.custom_attributes.get('meta_title')
+        except AttributeError:
+            return None
+
+    @property
+    @data_not_fetched_value(lambda self: self._meta_keyword)
+    def meta_keyword(self) -> Optional[str]:
+        try:
+            return self.custom_attributes.get('meta_keyword')
+        except AttributeError:
+            return None
+
+    @property
+    @data_not_fetched_value(lambda self: self._meta_description)
+    def meta_description(self) -> Optional[str]:
+        try:
+            return self.custom_attributes.get('meta_description')
+        except AttributeError:
+            return None
+
+    @property
+    @data_not_fetched_value(lambda self: self._url_key)
+    def url_key(self) -> Optional[str]:
+        try:
+            return self.custom_attributes.get('url_key')
+        except AttributeError:
+            return None
+
+    # ------------------------------------------------- PROPERTIES SETTERS (the ones that can be updateD)
+
+    @name.setter
+    @set_private_attr_after_setter
+    def name(self, value: Optional[str]) -> None:
+        self.mutable_data['name'] = value
+
+    @sku.setter
+    @set_private_attr_after_setter
+    def sku(self, value: str) -> None:
+        self.mutable_data['sku'] = value
+    @attribute_set_id.setter
+    @set_private_attr_after_setter
+    def attribute_set_id(self, value: Optional[int]) -> None:
+        self.mutable_data['attribute_set_id'] = value
+
+    @price.setter
+    @set_private_attr_after_setter
+    def price(self, value: Optional[float]) -> None:
+        self.mutable_data['price'] = value
+
+    @visibility.setter
+    @set_private_attr_after_setter
+    def visibility(self, value: Optional[int]) -> None:
+        self.mutable_data['visibility'] = value
+
+    @type_id.setter
+    @set_private_attr_after_setter
+    def type_id(self, value: Optional[str]) -> None:
+        self.mutable_data['type_id'] = value
+
+    @status.setter
+    def status(self, value: Optional[int]) -> None:
+        if value is True:
+            value = self.STATUS_ENABLED
+        elif value is False:
+            value = self.STATUS_DISABLED
+
+        self.mutable_data['status'] = value
+        self._status = value
+    @stock.setter
+    @set_private_attr_after_setter
+    def stock(self, value: Optional[int]) -> None:
+        if value is not None:
+            self.mutable_data.setdefault('extension_attributes', {})
+            stock_item = self.mutable_data['extension_attributes'].setdefault('stock_item', {})
+
+            # Update the relevant part of stock_item
+            stock_item.update({
+                "qty": value,
+                "is_in_stock": value > 0
+            })
+
+            if self.stock_item:
+                self.stock_item['qty'] = value
+
+    @backorders.setter
+    @set_private_attr_after_setter
+    def backorders(self, value: Optional[bool]) -> None:
+        if value is not None:
+            self.mutable_data.setdefault('extension_attributes', {})
+            stock_item = self.mutable_data['extension_attributes'].setdefault('stock_item', {})
+
+            # Update the relevant part of stock_item
+            stock_item.update({
+                "backorders": 1 if value else 0,
+                "use_config_backorders": False if value else True
+            })
+
+            if self.stock_item:
+                self.stock_item['backorders'] = 1 if value else 0
+
+    @description.setter
+    @set_private_attr_after_setter
+    def description(self, value: Optional[str]) -> None:
+        if value:
+            self.mutable_data.setdefault('custom_attributes', [])
+            for attr in self.mutable_data['custom_attributes']:
+                if attr['attribute_code'] == 'description':
+                    attr['value'] = value
+                    break
+            else:
+                self.mutable_data['custom_attributes'].append({'attribute_code': 'description', 'value': value})
+
+            self._update_internal_custom_attribute('description', value)
+
+    @special_price.setter
+    @set_private_attr_after_setter
+    def special_price(self, value: Optional[str]) -> None:
+        if value:
+            self.mutable_data.setdefault('custom_attributes', [])
+            for attr in self.mutable_data['custom_attributes']:
+                if attr['attribute_code'] == 'special_price':
+                    attr['value'] = value
+                    break
+            else:
+                self.mutable_data['custom_attributes'].append({'attribute_code': 'special_price', 'value': value})
+
+            self._update_internal_custom_attribute('special_price', value)
+
+    @short_description.setter
+    @set_private_attr_after_setter
+    def short_description(self, value: Optional[str]) -> None:
+        if value:
+            self.mutable_data.setdefault('custom_attributes', [])
+            for attr in self.mutable_data['custom_attributes']:
+                if attr['attribute_code'] == 'short_description':
+                    attr['value'] = value
+                    break
+            else:
+                self.mutable_data['custom_attributes'].append({'attribute_code': 'short_description', 'value': value})
+
+            self._update_internal_custom_attribute('short_description', value)
+
+    @category_ids.setter
+    @set_private_attr_after_setter
+    def category_ids(self, value: Optional[List[int]]) -> None:
+        if value:
+            self.mutable_data.setdefault('custom_attributes', [])
+            for attr in self.mutable_data['custom_attributes']:
+                if attr['attribute_code'] == 'category_ids':
+                    attr['value'] = value
+                    break
+            else:
+                self.mutable_data['custom_attributes'].append({'attribute_code': 'category_ids', 'value': value})
+
+        self._update_internal_custom_attribute('category_ids', value)
+
+    @meta_title.setter
+    @set_private_attr_after_setter
+    def meta_title(self, value: Optional[str]) -> None:
+        if value:
+            self.mutable_data.setdefault('custom_attributes', [])
+            for attr in self.mutable_data['custom_attributes']:
+                if attr['attribute_code'] == 'meta_title':
+                    attr['value'] = value
+                    break
+            else:
+                self.mutable_data['custom_attributes'].append({'attribute_code': 'meta_title', 'value': value})
+
+            self._update_internal_custom_attribute('meta_title', value)
+
+    @meta_keyword.setter
+    @set_private_attr_after_setter
+    def meta_keyword(self, value: Optional[str]) -> None:
+        if value:
+            self.mutable_data.setdefault('custom_attributes', [])
+            for attr in self.mutable_data['custom_attributes']:
+                if attr['attribute_code'] == 'meta_keyword':
+                    attr['value'] = value
+                    break
+            else:
+                self.mutable_data['custom_attributes'].append({'attribute_code': 'meta_keyword', 'value': value})
+
+            self._update_internal_custom_attribute('meta_keyword', value)
+
+    @meta_description.setter
+    @set_private_attr_after_setter
+    def meta_description(self, value: Optional[str]) -> None:
+        if value:
+            self.mutable_data.setdefault('custom_attributes', [])
+            for attr in self.mutable_data['custom_attributes']:
+                if attr['attribute_code'] == 'meta_description':
+                    attr['value'] = value
+                    break
+            else:
+                self.mutable_data['custom_attributes'].append({'attribute_code': 'meta_description', 'value': value})
+
+            self._update_internal_custom_attribute('meta_description', value)
+
+    @url_key.setter
+    @set_private_attr_after_setter
+    def url_key(self, value: Optional[str]) -> None:
+        if value:
+            self.mutable_data.setdefault('custom_attributes', [])
+            for attr in self.mutable_data['custom_attributes']:
+                if attr['attribute_code'] == 'url_key':
+                    attr['value'] = value
+                    break
+            else:
+                self.mutable_data['custom_attributes'].append({'attribute_code': 'url_key', 'value': value})
+
+            self._update_internal_custom_attribute('url_key', value)
+
+    # ------------------------------------------------- CUSTOM METHODS
 
     def update_stock(self, qty: int) -> bool:
         """Updates the stock quantity
@@ -233,6 +647,16 @@ class Product(Model):
         self.refresh()  # Back to default scope
         return True
 
+    def _update_internal_custom_attribute(self, key: str, value: Any) -> None:
+        """Update an attribute in self.custom_attributes if it exists.
+
+        :param key: The attribute key to update (e.g., 'category_ids').
+        :param value: The new value to set.
+        """
+        if hasattr(self, 'custom_attributes'):
+            if key in self.custom_attributes:
+                self.custom_attributes[key] = value
+
     def _update_attributes(self, attribute_data: dict, scope: Optional[str] = None) -> bool:
         """Sends a PUT request to update **top-level** product attributes
 
@@ -306,7 +730,7 @@ class Product(Model):
             'sku': self.sku,
         }
         if is_already_linked:  # Update the position
-            response = self.client.put(url, payload ={
+            response = self.client.put(url, payload={
                 'entity': product_link
             })
         else:  # Add a new product link
@@ -326,7 +750,7 @@ class Product(Model):
                 f"for {self}.\nMessage: {MagentoError.parse(response)}"
             )
             return False
-            
+
     def delete_product_link(self, link_type: str, linked_sku: str) -> bool:
         """Removes a related, up-sell, or cross-sell product link.
 
@@ -386,26 +810,6 @@ class Product(Model):
         """
         return self.client.customers.by_product(self)
 
-    def delete(self) -> bool:
-        """Deletes the product
-
-        .. hint:: If you delete a product by accident, the :class:`Product` object's ``data``
-         attribute will still contain the raw data, which can be used to recover it.
-
-         Alternatively, don't delete it by accident.
-        """
-        url = self.data_endpoint()
-        response = self.client.delete(url)
-
-        if response.ok and response.json() is True:
-            self.logger.info(f'Deleted {self}')
-            return True
-        else:
-            self.logger.error(
-                f'Failed to delete {self}. Message: {MagentoError.parse(response)}'
-            )
-            return False
-
     def get_product_links(self, link_type: str) -> List[Dict]:
         """Returns data for all product links of the specified type
 
@@ -429,49 +833,6 @@ class Product(Model):
                 child.refresh(scope)
         return self.children
 
-    @cached_property
-    def children(self) -> List[Product]:
-        """If the Product is a configurable product, returns a list of its child products"""
-        if self.type_id == 'configurable':
-            url = self.client.url_for(f'configurable-products/{self.encoded_sku}/children')
-            if (response := self.client.get(url)).ok:
-                return [self.parse(child) for child in response.json()]
-            else:
-                self.logger.error(f'Failed to get child products of {self}')
-        else:
-            self.logger.info('Only configurable products have child SKUs')
-        return []
-
-    @cached_property
-    def link(self) -> str:
-        """Link of the product"""
-        if url_key := self.custom_attributes.get('url_key'):
-            return self.client.store.active.base_url + url_key + '.html'
-
-    @cached_property
-    def categories(self) -> Optional[Category | List[Category]]:
-        """Categories the product is in, returned as a list of :class:`~.Category` objects"""
-        category_ids = self.custom_attributes.get('category_ids', [])
-        return self.client.categories.by_list('entity_id', category_ids)
-
-    @cached_property
-    def media_gallery_entries(self) -> List[MediaEntry]:
-        """The product's media gallery entries, returned as a list of :class:`MediaEntry` objects"""
-        return [MediaEntry(self, entry) for entry in self.__media_gallery_entries]
-
-    @cached_property
-    def thumbnail(self) -> MediaEntry:
-        """The :class:`MediaEntry` corresponding to the product's thumbnail"""
-        for entry in self.media_gallery_entries:
-            if entry.is_thumbnail:
-                return entry
-
-    @property
-    def thumbnail_link(self) -> str:
-        """Link of the product's :attr:`~.thumbnail` image"""
-        if self.thumbnail:
-            return self.thumbnail.link
-
     def get_media_by_id(self, entry_id: int) -> MediaEntry:
         """Access a :class:`MediaEntry` of the product by id
 
@@ -481,62 +842,8 @@ class Product(Model):
             if entry.id == entry_id:
                 return entry
 
-    @property
-    def encoded_sku(self) -> str:
-        """URL-encoded SKU, which is used in request endpoints"""
-        return self.encode(self.sku)
-
-    @cached_property
-    def option_skus(self) -> List[str]:
-        """The full SKUs for the product's customizable options, if they exist
-
-        .. hint:: When a product with customizable options is ordered, these SKUs are used by the API when
-            retrieving and searching for :class:`~.Order` and :class:`~.OrderItem` data
-        """
-        option_skus = []
-        if hasattr(self, 'options'):
-            for option in self.options:
-                base_sku = option['product_sku']
-                for val in option['values']:
-                    if val.get('sku'):
-                        option_skus.append(base_sku + '-' + val['sku'])
-        return option_skus
-
-    @property
-    def stock(self) -> int:
-        """Current stock quantity"""
-        if self.stock_item:
-            return self.stock_item['qty']
-
-    @property
-    def stock_item(self) -> dict:
-        """Stock data from the StockItem Interface"""
-        if hasattr(self, 'extension_attributes'):  # Missing if product was retrieved by id
-            if stock_data := self.extension_attributes.get('stock_item', {}):
-                return stock_data
-        # Use the SKU to refresh attributes with full product data
-        self.refresh()
-        return self.stock_item
-
-    @property
-    def stock_item_id(self) -> int:
-        """Item id of the StockItem, used to :meth:`~.update_stock`"""
-        if self.stock_item:
-            return self.stock_item['item_id']
-
-    @property
-    def description(self) -> str:
-        """Product description (as HTML)"""
-        return self.custom_attributes.get('description', '')
-
-    @property
-    def special_price(self) -> float:
-        """The current special (sale) price"""
-        return self.custom_attributes.get('special_price')
-
 
 class MediaEntry(Model):
-
     """Wraps a media gallery entry of a :class:`Product`"""
 
     MEDIA_TYPES = ['base', 'small', 'thumbnail', 'swatch']
@@ -544,7 +851,7 @@ class MediaEntry(Model):
     DOCUMENTATION = "https://adobe-commerce.redoc.ly/2.3.7-admin/tag/productsskumediaentryId"
     IDENTIFIER = "id"
 
-    def __init__(self, product: Product, entry: dict):
+    def __init__(self, product: Product, entry: dict, fetched: bool = False):
         """Initialize a MediaEntry object for a :class:`Product`
 
         :param product: the :class:`Product` that the gallery entry is associated with
@@ -553,7 +860,8 @@ class MediaEntry(Model):
         super().__init__(
             data=entry,
             client=product.client,
-            endpoint=f'products/{product.encoded_sku}/media'
+            endpoint=f'products/{product.encoded_sku}/media',
+            fetched=fetched
         )
         self.product = product
 
@@ -728,13 +1036,26 @@ class MediaEntry(Model):
 
 
 class ProductAttribute(Model):
-
     """Wrapper for the ``products/attributes`` endpoint"""
 
     DOCUMENTATION = "https://adobe-commerce.redoc.ly/2.3.7-admin/tag/productsattributes/"
     IDENTIFIER = "attribute_code"
 
-    def __init__(self, data: dict, client: Client):
+    # Frontend input type constants
+    TEXT = "text"
+    TEXTAREA = "textarea"
+    DATE = "date"
+    BOOLEAN = "boolean"
+    SELECT = "select"
+    MULTISELECT = "multiselect"
+    PRICE = "price"
+    MEDIA_IMAGE = "media_image"
+    GALLERY = "gallery"
+
+    # Allowed methods
+    ALLOWED_METHODS = [ModelMethod.GET, ModelMethod.CREATE, ModelMethod.UPDATE, ModelMethod.DELETE]
+
+    def __init__(self, data: dict, client: Client, fetched: bool = False):
         """Initialize a ProductAttribute object using an API response from the ``products/attributes`` endpoint
 
         :param data: the API response from the ``products/attributes`` endpoint
@@ -744,11 +1065,210 @@ class ProductAttribute(Model):
             data=data,
             client=client,
             endpoint='products/attributes',
-            private_keys=True
+            private_keys=True,
+            fetched=fetched
         )
 
     def __repr__(self):
         return f"<Product Attribute: {self.attribute_code}>"
+
+    def save(self, add_save_options: bool = True, scope: Optional[str] = None) -> bool:
+        return super().save(payload_prefix='attribute', add_save_options=add_save_options, scope=scope)
+
+    # ------------------------------------------------- PROPERTIES
+
+    @property
+    def required_keys(self) -> List[str]:
+        """Return the required keys for this model."""
+        return [self.IDENTIFIER]
+
+    @property
+    def mutable_keys(self) -> List[str]:
+        """Return the mutable keys for this model."""
+        return [
+            'is_html_allowed_on_front',
+            'is_visible',
+            'scope',
+            'entity_type_id',
+            'is_required',
+            'frontend_label',
+            'note',
+            'is_filterable',
+            'is_filterable_in_search',
+            'is_searchable',
+            'is_visible_on_front',
+            'is_comparable',
+            'used_for_sort_by',
+            'used_in_product_listing',
+            'frontend_labels',
+        ]
+
+    @property
+    def required_for_update_keys(self) -> List[str]:
+        """Return the keys that cannot be updated."""
+        return ['attribute_code', 'frontend_input', 'attribute_id']
+
+    @property
+    @data_not_fetched_value(lambda self: self._attribute_code)
+    def attribute_code(self) -> Optional[bool]:
+        return self._attribute_code
+
+    @attribute_code.setter
+    @set_private_attr_after_setter
+    def attribute_code(self, value: Optional[bool]) -> None:
+        self.mutable_data['attribute_code'] = value
+
+    @property
+    @data_not_fetched_value(lambda self: self._frontend_input)
+    def frontend_input(self) -> Optional[bool]:
+        return self._frontend_input
+
+    @frontend_input.setter
+    @set_private_attr_after_setter
+    def frontend_input(self, value: Optional[bool]) -> None:
+        self.mutable_data['frontend_input'] = value
+
+    @property
+    @data_not_fetched_value(lambda self: self._is_visible)
+    def is_visible(self) -> Optional[bool]:
+        return self._is_visible
+
+    @is_visible.setter
+    @set_private_attr_after_setter
+    def is_visible(self, value: Optional[bool]) -> None:
+        self.mutable_data['is_visible'] = value
+
+    @property
+    @data_not_fetched_value(lambda self: self._scope)
+    def scope(self) -> Optional[str]:
+        return self._scope
+
+    @scope.setter
+    @set_private_attr_after_setter
+    def scope(self, value: Optional[str]) -> None:
+        self.mutable_data['scope'] = value
+
+    @property
+    @data_not_fetched_value(lambda self: self._entity_type_id)
+    def entity_type_id(self) -> Optional[int]:
+        return self._entity_type_id
+
+    @entity_type_id.setter
+    @set_private_attr_after_setter
+    def entity_type_id(self, value: Optional[int]) -> None:
+        self.mutable_data['entity_type_id'] = value
+
+    @property
+    @data_not_fetched_value(lambda self: self._is_required)
+    def is_required(self) -> Optional[bool]:
+        return self._is_required
+
+    @is_required.setter
+    @set_private_attr_after_setter
+    def is_required(self, value: Optional[bool]) -> None:
+        self.mutable_data['is_required'] = value
+
+    @property
+    @data_not_fetched_value(lambda self: self._default_frontend_label)
+    def default_frontend_label(self) -> Optional[str]:
+        return self._default_frontend_label
+
+    @default_frontend_label.setter
+    @set_private_attr_after_setter
+    def default_frontend_label(self, value: Optional[str]) -> None:
+        self.mutable_data['default_frontend_label'] = value
+
+    @property
+    @data_not_fetched_value(lambda self: self._note)
+    def note(self) -> Optional[str]:
+        return self._note
+
+    @note.setter
+    @set_private_attr_after_setter
+    def note(self, value: Optional[str]) -> None:
+        self.mutable_data['note'] = value
+
+    @property
+    @data_not_fetched_value(lambda self: self._is_filterable)
+    def is_filterable(self) -> Optional[bool]:
+        return self._is_filterable
+
+    @is_filterable.setter
+    @set_private_attr_after_setter
+    def is_filterable(self, value: Optional[bool]) -> None:
+        self.mutable_data['is_filterable'] = value
+
+    @property
+    @data_not_fetched_value(lambda self: self._is_filterable_in_search)
+    def is_filterable_in_search(self) -> Optional[bool]:
+        return self._is_filterable_in_search
+
+    @is_filterable_in_search.setter
+    @set_private_attr_after_setter
+    def is_filterable_in_search(self, value: Optional[bool]) -> None:
+        self.mutable_data['is_filterable_in_search'] = value
+
+    @property
+    @data_not_fetched_value(lambda self: self._is_searchable)
+    def is_searchable(self) -> Optional[bool]:
+        return self._is_searchable
+
+    @is_searchable.setter
+    @set_private_attr_after_setter
+    def is_searchable(self, value: Optional[bool]) -> None:
+        self.mutable_data['is_searchable'] = value
+
+    @property
+    @data_not_fetched_value(lambda self: self._is_visible_on_front)
+    def is_visible_on_front(self) -> Optional[bool]:
+        return self._is_visible_on_front
+
+    @is_visible_on_front.setter
+    @set_private_attr_after_setter
+    def is_visible_on_front(self, value: Optional[bool]) -> None:
+        self.mutable_data['is_visible_on_front'] = value
+
+    @property
+    @data_not_fetched_value(lambda self: self._is_comparable)
+    def is_comparable(self) -> Optional[bool]:
+        return self._is_comparable
+
+    @is_comparable.setter
+    @set_private_attr_after_setter
+    def is_comparable(self, value: Optional[bool]) -> None:
+        self.mutable_data['is_comparable'] = value
+
+    @property
+    @data_not_fetched_value(lambda self: self._used_for_sort_by)
+    def used_for_sort_by(self) -> Optional[bool]:
+        return self._used_for_sort_by
+
+    @used_for_sort_by.setter
+    @set_private_attr_after_setter
+    def used_for_sort_by(self, value: Optional[bool]) -> None:
+        self.mutable_data['used_for_sort_by'] = value
+
+    @property
+    @data_not_fetched_value(lambda self: self._used_in_product_listing)
+    def used_in_product_listing(self) -> Optional[bool]:
+        return self._used_in_product_listing
+
+    @used_in_product_listing.setter
+    @set_private_attr_after_setter
+    def used_in_product_listing(self, value: Optional[bool]) -> None:
+        self.mutable_data['used_in_product_listing'] = value
+
+    @property
+    @data_not_fetched_value(lambda self: self._frontend_labels)
+    def frontend_labels(self) -> Optional[List]:
+        return self._frontend_labels
+
+    @frontend_labels.setter
+    @set_private_attr_after_setter
+    def frontend_labels(self, value: Optional[List]) -> None:
+        self.mutable_data['frontend_labels'] = value
+
+    # ------------------------------------------------- CUSTOM METHODS
 
     @property
     def excluded_keys(self) -> List[str]:
@@ -757,3 +1277,86 @@ class ProductAttribute(Model):
     @property
     def options(self):
         return self.unpack_attributes(self.__options, key='label')
+
+
+class AttributeOption(Model):
+    """Wrapper for the ``products/attributes/{attribute_code}/options`` endpoint"""
+
+    DOCUMENTATION = "https://developer.adobe.com/commerce/webapi/rest/quick-reference/"
+    IDENTIFIER = "option_id"
+    ALLOWED_METHODS = [ModelMethod.GET, ModelMethod.CREATE, ModelMethod.UPDATE, ModelMethod.DELETE]
+
+    def __init__(self,  data: dict, attribute: ProductAttribute, fetched: bool = False):
+        """Initialize an AttributeOption object for a :class:`ProductAttribute`
+
+        :param attribute: the :class:`ProductAttribute` that the option is associated with
+        :param option: the json response data to use as the source data
+        """
+        super().__init__(
+            data=data,
+            client=attribute.client,
+            endpoint=f'products/attributes/{attribute.attribute_code}/options',
+            fetched=fetched
+        )
+        self.attribute = attribute
+
+    def __repr__(self):
+        return f"<AttributeOption {self.attribute.attribute_code}: {self.label}>"
+
+    @property
+    def excluded_keys(self) -> List[str]:
+        return []
+
+    @property
+    def required_keys(self):
+        return []
+
+    @property
+    @data_not_fetched_value(lambda self: self._label)
+    def label(self) -> Optional[str]:
+        return self._label
+
+    @label.setter
+    @set_private_attr_after_setter
+    def label(self, value: Optional[str]) -> None:
+        self.mutable_data['label'] = value
+
+    @property
+    @data_not_fetched_value(lambda self: self._value)
+    def value(self) -> Optional[str]:
+        return self._value
+
+    @value.setter
+    @set_private_attr_after_setter
+    def value(self, value: Optional[str]) -> None:
+        self.mutable_data['value'] = value
+
+    @property
+    @data_not_fetched_value(lambda self: self._sort_order)
+    def sort_order(self) -> Optional[int]:
+        return self._sort_order
+
+    @sort_order.setter
+    @set_private_attr_after_setter
+    def sort_order(self, value: Optional[int]) -> None:
+        self.mutable_data['sort_order'] = value
+
+    @property
+    @data_not_fetched_value(lambda self: self._is_default)
+    def is_default(self) -> Optional[bool]:
+        return self._is_default
+
+    @is_default.setter
+    @set_private_attr_after_setter
+    def is_default(self, value: Optional[bool]) -> None:
+        self.mutable_data['is_default'] = value
+
+    @property
+    @data_not_fetched_value(lambda self: self._store_labels)
+    def store_labels(self) -> Optional[List[dict]]:
+        return self._store_labels
+
+    @store_labels.setter
+    @set_private_attr_after_setter
+    def store_labels(self, value: Optional[List[dict]]) -> None:
+        self.mutable_data['store_labels'] = value

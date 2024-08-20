@@ -110,7 +110,7 @@ Main Components
 .. admonition:: The :class:`~.SearchQuery` and Subclasses
    :class: search
 
-   * :meth:`~.execute` a search query on any endpoint
+   * :meth:`~.execute_search` a search query on any endpoint
    * Intuitive interface for :ref:`Custom Queries`
    * All predefined methods retrieve data using only 1-2 API requests
 

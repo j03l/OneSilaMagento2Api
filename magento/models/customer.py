@@ -14,7 +14,7 @@ class Customer(Model):
     DOCUMENTATION = 'https://adobe-commerce.redoc.ly/2.3.7-admin/tag/customerscustomerId'
     IDENTIFIER = 'id'
 
-    def __init__(self, data: dict, client: Client):
+    def __init__(self, data: dict, client: Client, fetched: bool = False):
         """Initialize a Customer object using an API response from the ``customers`` endpoint
 
         :param data: API response from the ``customers`` endpoint
@@ -24,7 +24,8 @@ class Customer(Model):
             data=data,
             client=client,
             endpoint='customers',
-            private_keys=False
+            private_keys=False,
+            fetched=fetched
         )
 
     def __repr__(self):

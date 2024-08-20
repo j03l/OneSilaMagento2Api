@@ -1,5 +1,5 @@
 from __future__ import annotations
-from typing import TYPE_CHECKING, Optional, List, Union
+from typing import TYPE_CHECKING, Optional, List
 from functools import cached_property
 from . import Model
 import copy
@@ -16,7 +16,7 @@ class Order(Model):
     DOCUMENTATION = 'https://adobe-commerce.redoc.ly/2.3.7-admin/tag/orders'
     IDENTIFIER = 'entity_id'
 
-    def __init__(self, data: dict, client: Client):
+    def __init__(self, data: dict, client: Client, fetched: bool = False):
         """Initialize an Order object using an API response from the ``orders`` endpoint
 
         :param data: API response from the ``orders`` endpoint
@@ -26,7 +26,8 @@ class Order(Model):
             data=data,
             client=client,
             endpoint='orders',
-            private_keys=True
+            private_keys=True,
+            fetched=fetched
         )
 
     def __repr__(self):
@@ -193,7 +194,7 @@ class OrderItem(Model):
     DOCUMENTATION = "https://adobe-commerce.redoc.ly/2.3.7-admin/tag/ordersitems"
     IDENTIFIER = 'item_id'
 
-    def __init__(self, item: dict, client: Optional[Client] = None, order: Optional[Order] = None):
+    def __init__(self, item: dict, client: Optional[Client] = None, order: Optional[Order] = None, fetched: bool = False):
         """Initialize an OrderItem using an API response from the ``orders/items`` endpoint
 
         .. note:: Initialization requires either a :class:`~.Client` or :class:`Order` object
@@ -212,7 +213,8 @@ class OrderItem(Model):
         super().__init__(
             data=item,
             client=client if client else order.client,
-            endpoint='orders/items'
+            endpoint='orders/items',
+            fetched=fetched
         )
         self.tax = item.get('base_tax_amount', item.get('tax_amount', 0))
         self.refund = item.get('base_amount_refunded', item.get('amount_refunded', 0))

@@ -17,7 +17,7 @@ Performing a :meth:`~.search`
 .. _api_endpoints: https://adobe-commerce.redoc.ly/2.3.7-admin/
 
 
-The :meth:`.Client.search` method lets you :meth:`~.execute` a query on
+The :meth:`.Client.search` method lets you :meth:`~.execute_search` a query on
 any |api_endpoints|_
 
 It creates a :class:`~.SearchQuery` for the endpoint,
@@ -45,7 +45,7 @@ allowing you to retrieve data about
 .. code-block:: python
 
     # Query the "invoices" endpoint (also: api.invoices)
-    >>> api.search("invoices").by_id(1)
+    >>> api.manager("invoices").by_id(1)
 
     <Magento Invoice: "#000000001"> for <Magento Order: "#000000001" placed on 2022-11-01 03:27:33>
 
@@ -150,7 +150,7 @@ Building Custom Search Queries
 
 In addition to the predefined methods, you can also build your own queries
 
-* Simply :meth:`~.add_criteria`, :meth:`~.restrict_fields`, and :meth:`~.execute` the search
+* Simply :meth:`~.add_criteria`, :meth:`~.restrict_fields`, and :meth:`~.execute_search` the search
 * The :meth:`~.since` and :meth:`~.until` methods allow you to further filter your query by date
 
 
@@ -164,7 +164,7 @@ In addition to the predefined methods, you can also build your own queries
     ...    field="grand_total",
     ...    value="50",
     ...    condition="gt"
-    ... ).since("2023-01-01").execute()
+    ... ).since("2023-01-01").execute_search()
 
     [<Magento Order: "#000000012" placed on 2023-01-02 05:19:55>, ...]
 
@@ -181,7 +181,7 @@ In addition to the predefined methods, you can also build your own queries
              ...    field="grand_total",
              ...    value="50",
              ...    condition="gt"
-             ... ).since("2023-01-01").execute()
+             ... ).since("2023-01-01").execute_search()
 
              [<Magento Order: "#000000012" placed on 2023-01-02 05:19:55>, ...]
 
@@ -217,7 +217,7 @@ Example: Making a :meth:`~.get` Request
    .. code-block:: python
 
         # Retrieve credit memo with id 7 using a search
-        >>> memo = api.search("creditmemo").by_id(7)
+        >>> memo = api.manager("creditmemo").by_id(7)
         >>> print(memo.data)
         >>> print(memo)
 
@@ -251,7 +251,7 @@ Example: Making a :meth:`~.get` Request
       .. code-block::
 
            # The same as above, but using a search
-           >>> memo = api.search("creditmemo").by_id(7)
+           >>> memo = api.manager("creditmemo").by_id(7)
            >>> url = memo.data_endpoint() + '/comments'
            >>> response = api.post(url, payload)
 

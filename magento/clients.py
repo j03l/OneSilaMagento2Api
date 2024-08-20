@@ -4,9 +4,12 @@ import pickle
 import requests
 from functools import cached_property
 from typing import Optional, Dict, List
+
+from .constants import Scope, StoreCode, AuthenticationMethod
+from .managers.product import ProductAttributeOptionManager
 from .utils import MagentoLogger, get_agent, parse_domain
 from .models import APIResponse, ProductAttribute
-from .search import SearchQuery, OrderSearch, ProductSearch, InvoiceSearch, CategorySearch, ProductAttributeSearch, OrderItemSearch, CustomerSearch
+from .managers import Manager, OrderManager, ProductManager, InvoiceManager, CategoryManager, ProductAttributeManager, OrderItemManager, CustomerManager
 from .exceptions import AuthenticationError, MagentoError
 
 
@@ -17,14 +20,18 @@ class Client:
     def __init__(
             self,
             domain: str,
-            username: str,
-            password: str,
+            username: Optional[str] = None,
+            password: Optional[str] = 'my-magento-client',
+            api_key: Optional[str] = None,
             scope: Optional[str] = '',
             local: bool = False,
             user_agent: Optional[str] = None,
             token: Optional[str] = None,
             log_level: str = 'INFO',
             login: bool = True,
+            strict_mode: bool = True,
+            stop_refresh: bool = False,
+            authentication_method: AuthenticationMethod = AuthenticationMethod.PASSWORD,
             **kwargs
     ):
         """Initialize a Client
@@ -45,6 +52,7 @@ class Client:
         :param domain: domain name of the Magento store (ex. ``domain.com`` or ``127.0.0.1/magento24``)
         :param username: username of the Magento Admin account
         :param password: password of the Magento Admin account
+        :param api_key: api key from the Magento Integration Section
         :param scope: the store view scope to :meth:`~search` and make requests on
         :param local: whether the Magento store is hosted locally
         :param user_agent: the user agent to use in requests
@@ -52,22 +60,31 @@ class Client:
         :param log_level: the logging level for logging to stdout
         :param login: if ``True``, calls :meth:`~.authenticate` upon initialization
         :param kwargs: see below
-
+        :param strict_mode: if ``True``, raises exceptions on operation failures; if ``False``, only logs errors
+        :param stop_refresh: We will stop the model refresh. For when we do want to do a quick update without getting the last data
+        :param authentication_type: WE can chose if we want to authenticate via username & password / api key
         ...
 
         :Extra Keyword Arguments:
             * **log_file** (``str``) – log file to use for the client's :attr:`logger`
             * **log_requests** (``bool``) - if ``True``, the logs from :mod:`requests`
-              will be added to the client's ``log_file``
+              will be added to the client's ``log_file``\
 
+        IMPORTANT!: If authentication with access token (api_key) doesn't work try this:
+        Login to Admin >> Stores >> Stores >> Settings >> Configuration >> SERVICES
+        >> Magento Web API >> Web API Security >> Allow Anonymous Guest Access: Yes
         """
         #: The base API URL
         self.BASE_URL: str = ("http" if local else "https") + f"://{parse_domain(domain)}/rest/V1/"
         #: The user credentials
-        self.USER_CREDENTIALS: Dict[str, str] = {
+        self.USER_CREDENTIALS: Dict[str, Optional[str]] = {
             'username': username,
             'password': password
         }
+        #: The api key (if provided)
+        self.api_key: Optional[str] = api_key
+        #: Authentication method
+        self.authentication_method: AuthenticationMethod = authentication_method
         #: The API access token
         self.ACCESS_TOKEN: str = token
         #: The Magento store domain
@@ -84,6 +101,13 @@ class Client:
         )
         #: An initialized :class:`Store` object
         self.store: Store = Store(self)
+        #: If strict_mode is True, raise exceptions on failures, otherwise only log errors
+        self.strict_mode: bool = strict_mode
+        # a way to stop refresh for when we only want to do quick updates
+        self.stop_refresh: bool = stop_refresh
+        # the current number of authentication retries
+        self.authentication_retries = 0
+
 
         if login:
             self.authenticate()
@@ -139,13 +163,13 @@ class Client:
                 return self.BASE_URL + endpoint
         return self.BASE_URL.replace('/V1', f'/{scope}/V1') + endpoint
 
-    def search(self, endpoint: str) -> SearchQuery:
-        """Initializes and returns a :class:`~.SearchQuery` corresponding to the specified endpoint
+    def manager(self, endpoint: str) -> Manager:
+        """Initializes and returns a :class:`~.Manager` corresponding to the specified endpoint
 
-        .. note:: Several endpoints have predefined :class:`~.SearchQuery` and :class:`~.Model` subclasses
+        .. note:: Several endpoints have predefined :class:`~.Manager` and :class:`~.Model` subclasses
 
-           If a subclass hasn't been defined for the ``endpoint`` yet, a general :class:`~.SearchQuery`
-           will be returned, which wraps the :attr:`~.SearchQuery.result` with :class:`~.APIResponse`
+           If a subclass hasn't been defined for the ``endpoint`` yet, a general :class:`~.Manager`
+           will be returned, which wraps the :attr:`~.Manager.result` with :class:`~.APIResponse`
 
         :param endpoint: a valid Magento API search endpoint
         """
@@ -163,43 +187,72 @@ class Client:
             return self.product_attributes
         if endpoint.lower() in ('customers', 'customers/search'):
             return self.customers
-        # Any other endpoint is queried with a general SearchQuery object
-        return SearchQuery(endpoint=endpoint, client=self)
+        if 'products/attributes' in endpoint.lower() and '/options' in endpoint.lower():
+            return self.product_attribute_options
+        # Any other endpoint is queried with a general Manager object
+        return Manager(endpoint=endpoint, client=self)
 
     @property
-    def orders(self) -> OrderSearch:
-        """Initializes an :class:`~.OrderSearch`"""
-        return OrderSearch(self)
+    def orders(self) -> OrderManager:
+        """Initializes an :class:`~.OrderManager`"""
+        return OrderManager(self)
 
     @property
-    def order_items(self) -> OrderItemSearch:
-        """Initializes an :class:`~.OrderItemSearch`"""
-        return OrderItemSearch(self)
+    def order_items(self) -> OrderItemManager:
+        """Initializes an :class:`~.OrderItemManager`"""
+        return OrderItemManager(self)
 
     @property
-    def invoices(self) -> InvoiceSearch:
-        """Initializes an :class:`~.InvoiceSearch`"""
-        return InvoiceSearch(self)
+    def invoices(self) -> InvoiceManager:
+        """Initializes an :class:`~.InvoiceManager`"""
+        return InvoiceManager(self)
 
     @property
-    def categories(self) -> CategorySearch:
-        """Initializes a :class:`~.CategorySearch`"""
-        return CategorySearch(self)
+    def categories(self) -> CategoryManager:
+        """Initializes a :class:`~.CategoryManager`"""
+        return CategoryManager(self)
 
     @property
-    def products(self) -> ProductSearch:
-        """Initializes a :class:`~.ProductSearch`"""
-        return ProductSearch(self)
+    def products(self) -> ProductManager:
+        """Initializes a :class:`~.ProductManager`"""
+        return ProductManager(self)
 
     @property
-    def product_attributes(self) -> ProductAttributeSearch:
-        """Initializes a :class:`~.ProductAttributeSearch`"""
-        return ProductAttributeSearch(self)
+    def product_attributes(self) -> ProductAttributeManager:
+        """Initializes a :class:`~.ProductAttributeManager`"""
+        return ProductAttributeManager(self)
 
     @property
-    def customers(self) -> CustomerSearch:
-        """Initializes a :class:`~.CustomerSearch`"""
-        return CustomerSearch(self)
+    def product_attribute_options_attribute(self) -> Optional[ProductAttribute]:
+        """Get or set the ProductAttribute required for the ProductAttributeOptionManager."""
+        if hasattr(self, '_product_attribute_options_attribute'):
+            return self._product_attribute_options_attribute
+        return None
+
+    @product_attribute_options_attribute.setter
+    def product_attribute_options_attribute(self, attribute: ProductAttribute) -> None:
+        """Set the ProductAttribute required for the ProductAttributeOptionManager."""
+        self._product_attribute_options_attribute = attribute
+        # Clear the _product_attribute_options to ensure it's reinitialized with the new attribute
+        if hasattr(self, '_product_attribute_options'):
+            del self._product_attribute_options
+
+    @property
+    def product_attribute_options(self) -> ProductAttributeOptionManager:
+        """Return the ProductAttributeOptionManager if the attribute has been set, otherwise raise an error."""
+        if not hasattr(self, '_product_attribute_options') or self._product_attribute_options is None:
+            if not hasattr(self, '_product_attribute_options_attribute') or self._product_attribute_options_attribute is None:
+                raise AttributeError(
+                    "Attribute was not set for this manager to work. Please set `product_attribute_options_attribute` first."
+                )
+
+        self._product_attribute_options = ProductAttributeOptionManager(client=self, attribute=self._product_attribute_options_attribute)
+        return self._product_attribute_options
+
+    @property
+    def customers(self) -> CustomerManager:
+        """Initializes a :class:`~.CustomerManager`"""
+        return CustomerManager(self)
 
     def get(self, url: str) -> requests.Response:
         """Sends an authorized ``GET`` request
@@ -234,22 +287,32 @@ class Client:
     def authenticate(self) -> bool:
         """Authenticates the :attr:`~.USER_CREDENTIALS` and retrieves an access token
         """
-        endpoint = self.url_for('integration/admin/token')
-        payload = self.USER_CREDENTIALS
-        headers = {
-            'Content-Type': 'application/json',
-            'User-Agent': self.user_agent
-        }
-        self.logger.info(f'Authenticating {payload["username"]} on {self.domain}...')
-        response = requests.post(
-            url=endpoint,
-            json=payload,
-            headers=headers
-        )
-        if response.ok:
-            self.ACCESS_TOKEN = response.json()
+        if self.authentication_retries == 3:
+            raise ValueError('Max attends of authentication attempts exceeded')
+        self.authentication_retries += 1
+
+        if self.USER_CREDENTIALS['password'] is None and self.api_key is None:
+            raise ValueError('Ether password or api key must be provided.')
+
+        if self.authentication_method == AuthenticationMethod.TOKEN:
+            self.ACCESS_TOKEN = self.api_key
         else:
-            raise AuthenticationError(self, response=response)
+            endpoint = self.url_for('integration/admin/token')
+            payload = self.USER_CREDENTIALS
+            headers = {
+                'Content-Type': 'application/json',
+                'User-Agent': self.user_agent
+            }
+            self.logger.info(f'Authenticating {payload["username"]} on {self.domain}...')
+            response = requests.post(
+                url=endpoint,
+                json=payload,
+                headers=headers
+            )
+            if response.ok:
+                self.ACCESS_TOKEN = response.json()
+            else:
+                raise AuthenticationError(self, response=response)
 
         self.logger.debug('Validating token...')
         try:
@@ -257,7 +320,8 @@ class Client:
         except AuthenticationError as e:
             raise AuthenticationError(self, msg='Token validation failed') from e
 
-        self.logger.info('Logged in to {}'.format(payload["username"]))
+        self.logger.info('Authenticated successfully to {}'.format(self.domain))
+        self.authentication_retries = 0
         return True
 
     def validate(self) -> bool:
@@ -299,6 +363,7 @@ class Client:
             self.logger.debug("Attempting to re-authenticate...")
             self.authenticate()  # Will raise AuthenticationError if unsuccessful (won't recurse infinitely)
             return self.request(method, url, payload)
+
 
         if response.status_code != 200:  # All non 401 responses are returned; errors are logged then handled by methods
             self.logger.error("Request to {} failed with status code {}.\n{message}".format(
@@ -404,44 +469,44 @@ class Store:
     @property
     def active(self) -> APIResponse:
         """Returns the store config corresponding to the current :attr:`~.Client.scope` of the :class:`Client`"""
-        store_code = 'default' if self.client.scope in ('', 'all') else self.client.scope
+        store_code = StoreCode.DEFAULT if self.client.scope in ('', StoreCode.ALL) else self.client.scope
         for store in self.configs:
             if store.code == store_code:
                 return store
 
-        if store_code == 'default':  # If custom store code is used for default view, use config with the smallest ID
+        if store_code == StoreCode.DEFAULT:  # If custom store code is used for default view, use config with the smallest ID
             return sorted(self.configs, key=lambda config: config.id)[0]
 
 
     @cached_property
     def configs(self) -> Optional[APIResponse | List[APIResponse]]:
         """Returns a list of all store configurations"""
-        return self.client.search('store/storeConfigs').execute()
+        return self.client.manager('store/storeConfigs').execute_search()
 
     @cached_property
     def views(self) -> Optional[APIResponse | List[APIResponse]]:
         """Returns a list of all store views"""
-        return self.client.search('store/storeViews').execute()
+        return self.client.manager('store/storeViews').execute_search()
 
     @cached_property
     def all_product_attributes(self) -> List[ProductAttribute]:
         """A cached list of all product attributes"""
-        return self.client.product_attributes.get_all()
+        return self.client.product_attributes.all_in_memory()
 
     @cached_property
     def store_view_product_attributes(self) -> List[ProductAttribute]:
         """A cached list of all product attributes with the ``Store View`` scope"""
-        return [attr for attr in self.all_product_attributes if attr.scope == 'store']
+        return [attr for attr in self.all_product_attributes if attr.scope == Scope.STORE]
 
     @cached_property
     def website_product_attributes(self) -> List[ProductAttribute]:
         """A cached list of all product attributes with the ``Web Site`` scope"""
-        return [attr for attr in self.all_product_attributes if attr.scope == 'website']
+        return [attr for attr in self.all_product_attributes if attr.scope == Scope.WEBSITE]
 
     @cached_property
     def global_product_attributes(self) -> List[ProductAttribute]:
         """A cached list of all product attributes with the ``Global`` scope"""
-        return [attr for attr in self.all_product_attributes if attr.scope == 'global']
+        return [attr for attr in self.all_product_attributes if attr.scope == Scope.GLOBAL]
 
     @cached_property
     def website_attribute_codes(self) -> List[str]:

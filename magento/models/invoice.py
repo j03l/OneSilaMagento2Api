@@ -15,7 +15,7 @@ class Invoice(Model):
     DOCUMENTATION = 'https://adobe-commerce.redoc.ly/2.3.7-admin/tag/invoices'
     IDENTIFIER = 'entity_id'
 
-    def __init__(self, data: dict, client: Client):
+    def __init__(self, data: dict, client: Client, fetched: bool = False):
         """Initialize an Invoice object using an API response from the ``invoices`` endpoint
 
         :param data: API response from the ``invoices`` endpoint
@@ -25,7 +25,8 @@ class Invoice(Model):
             data=data,
             client=client,
             endpoint='invoices',
-            private_keys=True
+            private_keys=True,
+            fetched=fetched
         )
 
     def __repr__(self):
@@ -69,7 +70,7 @@ class InvoiceItem(Model):
     DOCUMENTATION = "https://adobe-commerce.redoc.ly/2.3.7-admin/tag/invoicesid"
     IDENTIFIER = 'entity_id'
 
-    def __init__(self, item: dict, invoice: Invoice):
+    def __init__(self, item: dict, invoice: Invoice, fetched: bool = False):
         """Initialize an InvoiceItem of an :class:`Invoice`
 
         :param item: API response to use as source data
@@ -78,7 +79,8 @@ class InvoiceItem(Model):
         super().__init__(
             data=item,
             client=invoice.client,
-            endpoint=f'invoices/{invoice.id}'
+            endpoint=f'invoices/{invoice.id}',
+            fetched=fetched
         )
         self.invoice = invoice
 

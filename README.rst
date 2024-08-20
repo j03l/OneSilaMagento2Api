@@ -24,7 +24,7 @@
 .. _..Client.products: https://my-magento.readthedocs.io/en/latest/clients.html#magento.clients.Client.products
 .. |..Client.scope| replace:: ``Client.scope``
 .. _..Client.scope: https://my-magento.readthedocs.io/en/latest/clients.html#magento.clients.Client.scope
-.. |..Client.search| replace:: ``Client.search()``
+.. |..Client.search| replace:: ``Client.manager()``
 .. _..Client.search: https://my-magento.readthedocs.io/en/latest/clients.html#magento.clients.Client.search
 .. |..Client.url_for| replace:: ``Client.url_for()``
 .. _..Client.url_for: https://my-magento.readthedocs.io/en/latest/clients.html#magento.clients.Client.url_for
@@ -80,8 +80,8 @@
 .. _.~.by_list: https://my-magento.readthedocs.io/en/latest/search_module.html#magento.search.SearchQuery.by_list
 .. |.~.delete| replace:: ``delete()``
 .. _.~.delete: https://my-magento.readthedocs.io/en/latest/clients.html#magento.clients.Client.delete
-.. |.~.execute| replace:: ``execute()``
-.. _.~.execute: https://my-magento.readthedocs.io/en/latest/search_module.html#magento.search.SearchQuery.execute
+.. |.~.execute_search| replace:: ``execute_search()``
+.. _.~.execute_search: https://my-magento.readthedocs.io/en/latest/search_module.html#magento.search.SearchQuery.execute_search
 .. |.~.get| replace:: ``get()``
 .. _.~.get: https://my-magento.readthedocs.io/en/latest/clients.html#magento.clients.Client.get
 .. |..get_api| replace:: ``get_api()``
@@ -244,7 +244,7 @@ Main Components
    </th>
    <tr><td>
 
-* |.~.execute|_ a search query on any endpoint
+* |.~.execute_search|_ a search query on any endpoint
 * Intuitive interface for `Building Custom Search Queries <https://my-magento.readthedocs.io/en/latest/interact-with-api.html#custom-queries>`_
 * All predefined methods retrieve data using only 1-2 API requests
 
@@ -297,7 +297,7 @@ Endpoints are wrapped with a |.~.Model|_ and |.~.SearchQuery|_ subclass as follo
    "``products/attributes``", "|..Client.product_attributes|_", "|.~.ProductAttributeSearch|_", "|.~.ProductAttribute|_"
    "``categories``", "|..Client.categories|_", "|.~.CategorySearch|_", "|.~.Category|_"
    "``customers``", "|..Client.customers|_", "|.~.CustomerSearch|_", "|.~.Customer|_"
-   "``endpoint``", "``Client.search('endpoint')``", "|.~.SearchQuery|_", "|.~.APIResponse|_"
+   "``endpoint``", "``Client.manager('endpoint')``", "|.~.SearchQuery|_", "|.~.APIResponse|_"
 
 
 
@@ -437,7 +437,7 @@ Performing a |.~.search|_
 .. _api_endpoints: https://adobe-commerce.redoc.ly/2.3.7-admin/
 
 
-The |..Client.search|_ method lets you |.~.execute|_ a query on
+The |..Client.search|_ method lets you |.~.execute_search|_ a query on
 any |api_endpoints|_
 
 It creates a |.~.SearchQuery|_ for the endpoint,
@@ -458,7 +458,7 @@ Example: |.~.search|_ an endpoint |.~.by_id|_
 .. code-block:: python
 
     # Query the "invoices" endpoint (also: api.invoices)
-    >>> api.search("invoices").by_id(1)
+    >>> api.manager("invoices").by_id(1)
 
     <Magento Invoice: "#000000001"> for <Magento Order: "#000000001" placed on 2022-11-01 03:27:33>
 
@@ -584,7 +584,7 @@ Building Custom Search Queries
 
 In addition to the predefined methods, you can also build your own queries
 
-* Simply |.~.add_criteria|_, |.~.restrict_fields|_, and |.~.execute|_ the search
+* Simply |.~.add_criteria|_, |.~.restrict_fields|_, and |.~.execute_search|_ the search
 * The |.~.since|_ and |.~.until|_ methods allow you to further filter your query by date
 
 
@@ -609,7 +609,7 @@ In addition to the predefined methods, you can also build your own queries
  ...    field="grand_total",
  ...    value="50",
  ...    condition="gt"
- ... ).since("2023-01-01").execute()
+ ... ).since("2023-01-01").execute_search()
 
  [<Magento Order: "#000000012" placed on 2023-01-02 05:19:55>, ...]
 
@@ -668,7 +668,7 @@ be wrapped by  |.~.APIResponse|_ or other |.~.Model|_
 .. code-block:: python
 
      # Retrieve credit memo with id 7 using a search
-     >>> memo = api.search("creditmemo").by_id(7)
+     >>> memo = api.manager("creditmemo").by_id(7)
      >>> print(memo.data)
      >>> print(memo)
 

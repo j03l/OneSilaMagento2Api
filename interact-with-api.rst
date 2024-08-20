@@ -28,8 +28,8 @@
 .. _.get_api: https://github.com/tdkorn/my-magento/blob/v2.1.1b0/magento/__init__.py#L16-L39
 .. |.authenticate| replace:: ``authenticate()``
 .. _.authenticate: https://github.com/tdkorn/my-magento/blob/v2.1.1b0/magento/clients.py#L227-L254
-.. |.execute| replace:: ``execute()``
-.. _.execute: https://github.com/tdkorn/my-magento/blob/v2.1.1b0/magento/search.py#L130-L141
+.. |.execute_search| replace:: ``execute_search()``
+.. _.execute_search: https://github.com/tdkorn/my-magento/blob/v2.1.1b0/magento/search.py#L130-L141
 .. |.search| replace:: ``search()``
 .. _.search: https://github.com/tdkorn/my-magento/blob/v2.1.1b0/magento/clients.py#L144-L167
 .. |.by_id| replace:: ``by_id()``
@@ -77,7 +77,7 @@
 Performing a |.search|_
 ~~~~~~~~~~~~~~~~~~~~~~~~~
 
-The |.search|_ method lets you |.execute|_ a query on any |api_endpoint|_
+The |.search|_ method lets you |.execute_search|_ a query on any |api_endpoint|_
 
 It creates a |.SearchQuery|_ for the endpoint,
 allowing you to retrieve data for
@@ -150,7 +150,7 @@ Example: |.search|_ an endpoint |.by_id|_
 .. code-block:: python
 
     # Query the "invoices" endpoint (also: api.invoices)
-    >>> api.search("invoices").by_id(1)
+    >>> api.manager("invoices").by_id(1)
 
     <Magento Invoice: "#000000001"> for <Magento Order: "#000000001" placed on 2022-11-01 03:27:33>
 
@@ -272,7 +272,7 @@ Building Custom Search Queries
 
 In addition to the predefined methods, you can also build your own queries
 
-* Simply |.add_criteria|_, |.restrict_fields|_, and |.execute|_ the search
+* Simply |.add_criteria|_, |.restrict_fields|_, and |.execute_search|_ the search
 * The |.since|_ and |.until|_ methods allow you to further filter your query by date
 
 |
@@ -293,7 +293,7 @@ In addition to the predefined methods, you can also build your own queries
     ...    field="grand_total",
     ...    value="50",
     ...    condition="gt"
-    ... ).since("2023-01-01").execute()
+    ... ).since("2023-01-01").execute_search()
 
     [<Magento Order: "#000000012" placed on 2023-01-02 05:19:55>, <Magento Order: "#000000013" placed on 2023-01-05 09:24:13>]
 
@@ -344,7 +344,7 @@ Example: Making a |.get|_ Request
 .. code-block:: python
 
    # Retrieve credit memo with id 7 using a search
-   >>> memo = api.search("creditmemo").by_id(7)
+   >>> memo = api.manager("creditmemo").by_id(7)
    >>> print(memo.data)
    >>> print(memo)
 

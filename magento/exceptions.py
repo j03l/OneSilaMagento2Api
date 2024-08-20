@@ -81,3 +81,40 @@ class AuthenticationError(MagentoError):
 
     def __init__(self, client: Client, msg: Optional[str] = None, response: Optional[requests.Response] = None):
         super().__init__(client, msg, response)
+
+class OperationNotAllowedError(MagentoError):
+    """Exception class for when an operation is not allowed on a model"""
+
+    def __init__(self, client: Client, method: str, model: str, response: Optional[requests.Response] = None):
+        """
+        Initialize the exception with the method and model details.
+
+        :param client: an initialized :class:`~.Client` object
+        :param method: the method that is not allowed (e.g., 'CREATE', 'UPDATE')
+        :param model: the name of the model on which the method is not allowed
+        :param response: optional response to parse an error message from
+        """
+        msg = f'Method "{method}" is not allowed for model "{model}".'
+        super().__init__(client, msg, response)
+
+class InstanceGetFailed(Exception):
+    """Raised when the creation of a model instance fails."""
+    def __init__(self, message):
+        super().__init__(message)
+
+class InstanceCreateFailed(Exception):
+    """Raised when the creation of a model instance fails."""
+    def __init__(self, message):
+        super().__init__(message)
+
+class InstanceUpdateFailed(Exception):
+    """Raised when the creation of a model instance fails."""
+    def __init__(self, message):
+        super().__init__(message)
+
+class InstanceDeleteFailed(Exception):
+    """Raised when an instance deletion operation fails."""
+
+    def __init__(self, message: str):
+        super().__init__(message)
+        self.message = message

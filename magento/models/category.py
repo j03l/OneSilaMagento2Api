@@ -18,7 +18,7 @@ class Category(Model):
     DOCUMENTATION = 'https://adobe-commerce.redoc.ly/2.3.7-admin/tag/categories'
     IDENTIFIER = 'id'
 
-    def __init__(self, data: dict, client: Client):
+    def __init__(self, data: dict, client: Client, fetched: bool = False):
         """Initialize a Category object using an API response from the ``categories`` endpoint
 
         :param data: raw API response
@@ -26,7 +26,8 @@ class Category(Model):
         super().__init__(
             data=data,
             client=client,
-            endpoint='categories'
+            endpoint='categories',
+            fetched=fetched
         )
 
     def __repr__(self):

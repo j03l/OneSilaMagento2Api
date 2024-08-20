@@ -46,7 +46,7 @@ v2.1.0
    .. code-block:: python
 
        # Retrieve orders from the first 7 days of 2023
-       >>> api.orders.since("2023-01-01").until("2023-01-07").execute()
+       >>> api.orders.since("2023-01-01").until("2023-01-07").execute_search()
 
        [<Magento Order: #000000012 placed on 2023-01-02 05:19:55>, ]
 
@@ -61,7 +61,7 @@ v2.1.0
        ...     field="grand_total",
        ...     value="50",
        ...     condition="gteq"
-       ... ).since("2022-01-01").execute()
+       ... ).since("2022-01-01").execute_search()
 
        [<Magento Order: #000000003 placed on 2022-12-21 08:09:33>, ...]
 
