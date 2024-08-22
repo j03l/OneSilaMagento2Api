@@ -24,7 +24,6 @@ class Customer(Model):
             data=data,
             client=client,
             endpoint='customers',
-            private_keys=False,
             fetched=fetched
         )
 

@@ -6,10 +6,12 @@ from functools import cached_property
 from typing import Optional, Dict, List
 
 from .constants import Scope, StoreCode, AuthenticationMethod
-from .managers.product import ProductAttributeOptionManager
+from .managers.attribute_set import AttributeSetManager
+from .managers.product import ProductAttributeOptionManager, MediaEntryManager
 from .utils import MagentoLogger, get_agent, parse_domain
-from .models import APIResponse, ProductAttribute
-from .managers import Manager, OrderManager, ProductManager, InvoiceManager, CategoryManager, ProductAttributeManager, OrderItemManager, CustomerManager
+from .models import APIResponse, ProductAttribute, Product
+from .managers import Manager, OrderManager, ProductManager, InvoiceManager, CategoryManager, ProductAttributeManager, OrderItemManager, CustomerManager, \
+    ShipmentManager
 from .exceptions import AuthenticationError, MagentoError
 
 
@@ -30,7 +32,6 @@ class Client:
             log_level: str = 'INFO',
             login: bool = True,
             strict_mode: bool = True,
-            stop_refresh: bool = False,
             authentication_method: AuthenticationMethod = AuthenticationMethod.PASSWORD,
             **kwargs
     ):
@@ -61,7 +62,6 @@ class Client:
         :param login: if ``True``, calls :meth:`~.authenticate` upon initialization
         :param kwargs: see below
         :param strict_mode: if ``True``, raises exceptions on operation failures; if ``False``, only logs errors
-        :param stop_refresh: We will stop the model refresh. For when we do want to do a quick update without getting the last data
         :param authentication_type: WE can chose if we want to authenticate via username & password / api key
         ...
 
@@ -73,6 +73,7 @@ class Client:
         IMPORTANT!: If authentication with access token (api_key) doesn't work try this:
         Login to Admin >> Stores >> Stores >> Settings >> Configuration >> SERVICES
         >> Magento Web API >> Web API Security >> Allow Anonymous Guest Access: Yes
+                           >> OAuth >> Allow OAuth Access Tokens to be used as standalone Bearer token: Yes
         """
         #: The base API URL
         self.BASE_URL: str = ("http" if local else "https") + f"://{parse_domain(domain)}/rest/V1/"
@@ -103,8 +104,6 @@ class Client:
         self.store: Store = Store(self)
         #: If strict_mode is True, raise exceptions on failures, otherwise only log errors
         self.strict_mode: bool = strict_mode
-        # a way to stop refresh for when we only want to do quick updates
-        self.stop_refresh: bool = stop_refresh
         # the current number of authentication retries
         self.authentication_retries = 0
 
@@ -185,10 +184,16 @@ class Client:
             return self.products
         if endpoint.lower() == 'products/attributes':
             return self.product_attributes
+        if endpoint.lower() == 'products/attribute-sets' or endpoint.lower() == 'products/attribute-sets/list':
+            return self.product_attribute_set
+        if endpoint.lower() == 'shipment' or endpoint.lower() == 'shipments':
+            return self.shipments
         if endpoint.lower() in ('customers', 'customers/search'):
             return self.customers
         if 'products/attributes' in endpoint.lower() and '/options' in endpoint.lower():
             return self.product_attribute_options
+        if 'products/' in endpoint.lower() and '/media' in endpoint.lower():
+            return self.product_media_entries
         # Any other endpoint is queried with a general Manager object
         return Manager(endpoint=endpoint, client=self)
 
@@ -223,6 +228,16 @@ class Client:
         return ProductAttributeManager(self)
 
     @property
+    def product_attribute_set(self) -> AttributeSetManager:
+        """Initializes a :class:`~.ProductAttributeManager`"""
+        return AttributeSetManager(self)
+
+    @property
+    def shipments(self) -> ShipmentManager:
+        """Initializes a :class:`~.ProductAttributeManager`"""
+        return ShipmentManager(self)
+
+    @property
     def product_attribute_options_attribute(self) -> Optional[ProductAttribute]:
         """Get or set the ProductAttribute required for the ProductAttributeOptionManager."""
         if hasattr(self, '_product_attribute_options_attribute'):
@@ -232,10 +247,11 @@ class Client:
     @product_attribute_options_attribute.setter
     def product_attribute_options_attribute(self, attribute: ProductAttribute) -> None:
         """Set the ProductAttribute required for the ProductAttributeOptionManager."""
-        self._product_attribute_options_attribute = attribute
         # Clear the _product_attribute_options to ensure it's reinitialized with the new attribute
         if hasattr(self, '_product_attribute_options'):
             del self._product_attribute_options
+
+        self._product_attribute_options_attribute = attribute
 
     @property
     def product_attribute_options(self) -> ProductAttributeOptionManager:
@@ -248,6 +264,34 @@ class Client:
 
         self._product_attribute_options = ProductAttributeOptionManager(client=self, attribute=self._product_attribute_options_attribute)
         return self._product_attribute_options
+
+    @property
+    def media_entries_product(self) -> Optional[Product]:
+        """Get or set the Product required for the MediaEntryManager."""
+        if hasattr(self, '_media_entries_product'):
+            return self._media_entries_product
+        return None
+
+    @media_entries_product.setter
+    def media_entries_product(self, product: Product) -> None:
+        """Set the Product required for the MediaEntryManager."""
+        # Clear the _media_entry_manager to ensure it's reinitialized with the new product
+        if hasattr(self, '_media_entry_manager'):
+            del self._media_entry_manager
+
+        self._media_entries_product = product
+
+    @property
+    def product_media_entries(self) -> MediaEntryManager:
+        """Return the MediaEntryManager if the product has been set, otherwise raise an error."""
+        if not hasattr(self, '_media_entry_manager') or self._media_entry_manager is None:
+            if not hasattr(self, '_media_entries_product') or self._media_entries_product is None:
+                raise AttributeError(
+                    "Product was not set for this manager to work. Please set `media_entries_product` first."
+                )
+
+        self._media_entry_manager = MediaEntryManager(client=self, product=self._media_entries_product)
+        return self._media_entry_manager
 
     @property
     def customers(self) -> CustomerManager:
@@ -469,12 +513,12 @@ class Store:
     @property
     def active(self) -> APIResponse:
         """Returns the store config corresponding to the current :attr:`~.Client.scope` of the :class:`Client`"""
-        store_code = StoreCode.DEFAULT if self.client.scope in ('', StoreCode.ALL) else self.client.scope
+        store_code = StoreCode.DEFAULT.value if self.client.scope in ('', StoreCode.ALL.value) else self.client.scope
         for store in self.configs:
             if store.code == store_code:
                 return store
 
-        if store_code == StoreCode.DEFAULT:  # If custom store code is used for default view, use config with the smallest ID
+        if store_code == StoreCode.DEFAULT.value:  # If custom store code is used for default view, use config with the smallest ID
             return sorted(self.configs, key=lambda config: config.id)[0]
 
 
@@ -496,17 +540,17 @@ class Store:
     @cached_property
     def store_view_product_attributes(self) -> List[ProductAttribute]:
         """A cached list of all product attributes with the ``Store View`` scope"""
-        return [attr for attr in self.all_product_attributes if attr.scope == Scope.STORE]
+        return [attr for attr in self.all_product_attributes if attr.scope == Scope.STORE.value]
 
     @cached_property
     def website_product_attributes(self) -> List[ProductAttribute]:
         """A cached list of all product attributes with the ``Web Site`` scope"""
-        return [attr for attr in self.all_product_attributes if attr.scope == Scope.WEBSITE]
+        return [attr for attr in self.all_product_attributes if attr.scope == Scope.WEBSITE.value]
 
     @cached_property
     def global_product_attributes(self) -> List[ProductAttribute]:
         """A cached list of all product attributes with the ``Global`` scope"""
-        return [attr for attr in self.all_product_attributes if attr.scope == Scope.GLOBAL]
+        return [attr for attr in self.all_product_attributes if attr.scope == Scope.GLOBAL.value]
 
     @cached_property
     def website_attribute_codes(self) -> List[str]:

@@ -41,7 +41,6 @@ class Product(Model):
             client=client,
             fetched=fetched,
             endpoint='products',
-            private_keys=True,
         )
 
     def __repr__(self):
@@ -126,7 +125,7 @@ class Product(Model):
         return self.encode(self.sku)
 
     @cached_property
-    @data_not_fetched_value(lambda self: None)
+    @data_not_fetched_value(lambda self: [])
     def children(self) -> Optional[List[Product]]:
         """If the Product is a configurable product, returns a list of its child products"""
         if self.type_id == 'configurable':
@@ -157,7 +156,7 @@ class Product(Model):
     @data_not_fetched_value(lambda self: [])
     def media_gallery_entries(self) -> List[MediaEntry]:
         """The product's media gallery entries, returned as a list of :class:`MediaEntry` objects"""
-        return [MediaEntry(self, entry) for entry in self.__media_gallery_entries]
+        return [MediaEntry(self, entry, fetched=True) for entry in self.__media_gallery_entries]
 
     @cached_property
     @data_not_fetched_value(lambda self: None)
@@ -850,6 +849,9 @@ class MediaEntry(Model):
 
     DOCUMENTATION = "https://adobe-commerce.redoc.ly/2.3.7-admin/tag/productsskumediaentryId"
     IDENTIFIER = "id"
+    PAYLOAD_PREFIX = 'entry'
+    ALLOWED_METHODS = [ModelMethod.GET, ModelMethod.CREATE, ModelMethod.UPDATE, ModelMethod.DELETE]
+
 
     def __init__(self, product: Product, entry: dict, fetched: bool = False):
         """Initialize a MediaEntry object for a :class:`Product`
@@ -861,20 +863,81 @@ class MediaEntry(Model):
             data=entry,
             client=product.client,
             endpoint=f'products/{product.encoded_sku}/media',
-            fetched=fetched
+            fetched=fetched,
         )
         self.product = product
 
     def __repr__(self):
         return f"<MediaEntry {self.id} for {self.product}: {self.label}>"
 
+    def save(self, add_save_options: bool = False, scope: Optional[str] = None, refresh: bool = True) -> bool:
+        if not self._fetched and 'image_url' in self.data:
+            self.mutable_data['image_url'] = self.data['image_url']
+
+        return super().save(add_save_options=add_save_options, scope=scope, refresh=refresh)
+
     def query_endpoint(self) -> None:
         """No search endpoint exists for media gallery entries"""
         return self.logger.info("There is no search interface for media gallery entries")
 
     @property
-    def excluded_keys(self) -> List[str]:
-        return []
+    def required_for_update_keys(self) -> List[str]:
+        return ['id']
+
+    @property
+    @data_not_fetched_value(lambda self: self._media_type)
+    def media_type(self) -> Optional[str]:
+        return self._media_type
+
+    @media_type.setter
+    @set_private_attr_after_setter
+    def media_type(self, value: Optional[str]) -> None:
+        self.mutable_data['media_type'] = value
+
+    @property
+    @data_not_fetched_value(lambda self: self._label)
+    def label(self) -> Optional[str]:
+        return self._label
+
+    @label.setter
+    @set_private_attr_after_setter
+    def label(self, value: Optional[str]) -> None:
+        self.mutable_data['label'] = value
+
+    @property
+    @data_not_fetched_value(lambda self: self._position)
+    def position(self) -> Optional[int]:
+        return self._position
+
+    @position.setter
+    @set_private_attr_after_setter
+    def position(self, value: Optional[int]) -> None:
+        if not isinstance(value, int):
+            raise TypeError('position must be an int')
+        self.mutable_data['position'] = value
+
+    @property
+    @data_not_fetched_value(lambda self: self._disabled)
+    def disabled(self) -> Optional[bool]:
+        return self._disabled
+
+    @disabled.setter
+    @set_private_attr_after_setter
+    def disabled(self, value: Optional[bool]) -> None:
+        self.mutable_data['disabled'] = value
+
+    @property
+    @data_not_fetched_value(lambda self: self._types)
+    def types(self) -> Optional[List[str]]:
+        return self._types
+
+    @types.setter
+    @set_private_attr_after_setter
+    def types(self, value: Optional[List[str]]) -> None:
+        if not isinstance(value, list):
+            raise TypeError('types must be a list')
+        self.mutable_data['types'] = [t for t in value if t in self.MEDIA_TYPES]
+
 
     @property
     def is_enabled(self):
@@ -1055,6 +1118,8 @@ class ProductAttribute(Model):
     # Allowed methods
     ALLOWED_METHODS = [ModelMethod.GET, ModelMethod.CREATE, ModelMethod.UPDATE, ModelMethod.DELETE]
 
+    ENTITY_TYPE_ID = 4
+
     def __init__(self, data: dict, client: Client, fetched: bool = False):
         """Initialize a ProductAttribute object using an API response from the ``products/attributes`` endpoint
 
@@ -1065,22 +1130,18 @@ class ProductAttribute(Model):
             data=data,
             client=client,
             endpoint='products/attributes',
-            private_keys=True,
             fetched=fetched
         )
 
     def __repr__(self):
         return f"<Product Attribute: {self.attribute_code}>"
 
-    def save(self, add_save_options: bool = True, scope: Optional[str] = None) -> bool:
-        return super().save(payload_prefix='attribute', add_save_options=add_save_options, scope=scope)
-
     # ------------------------------------------------- PROPERTIES
 
     @property
     def required_keys(self) -> List[str]:
         """Return the required keys for this model."""
-        return [self.IDENTIFIER]
+        return []
 
     @property
     def mutable_keys(self) -> List[str]:
@@ -1089,7 +1150,6 @@ class ProductAttribute(Model):
             'is_html_allowed_on_front',
             'is_visible',
             'scope',
-            'entity_type_id',
             'is_required',
             'frontend_label',
             'note',
@@ -1149,14 +1209,13 @@ class ProductAttribute(Model):
         self.mutable_data['scope'] = value
 
     @property
-    @data_not_fetched_value(lambda self: self._entity_type_id)
-    def entity_type_id(self) -> Optional[int]:
-        return self._entity_type_id
+    def entity_type_id(self) -> int:
+        """Read-only property for entity_type_id."""
+        return self.ENTITY_TYPE_ID
 
     @entity_type_id.setter
-    @set_private_attr_after_setter
     def entity_type_id(self, value: Optional[int]) -> None:
-        self.mutable_data['entity_type_id'] = value
+        pass
 
     @property
     @data_not_fetched_value(lambda self: self._is_required)
@@ -1275,37 +1334,63 @@ class ProductAttribute(Model):
         return ['options']
 
     @property
-    def options(self):
+    def unpacked_options(self):
         return self.unpack_attributes(self.__options, key='label')
+
+    @property
+    def options(self) -> Optional[List[AttributeOption]]:
+        return [AttributeOption(data=option, client=self.client, attribute=self, fetched=True) for option in self.__options if option['value'] != '']
 
 
 class AttributeOption(Model):
     """Wrapper for the ``products/attributes/{attribute_code}/options`` endpoint"""
 
     DOCUMENTATION = "https://developer.adobe.com/commerce/webapi/rest/quick-reference/"
-    IDENTIFIER = "option_id"
+    IDENTIFIER = "value"
     ALLOWED_METHODS = [ModelMethod.GET, ModelMethod.CREATE, ModelMethod.UPDATE, ModelMethod.DELETE]
 
-    def __init__(self,  data: dict, attribute: ProductAttribute, fetched: bool = False):
+    def __init__(self,  data: dict, client: Client, attribute: ProductAttribute, fetched: bool = False):
         """Initialize an AttributeOption object for a :class:`ProductAttribute`
 
         :param attribute: the :class:`ProductAttribute` that the option is associated with
         :param option: the json response data to use as the source data
         """
+        # we set the attribute for the api for this client
+        client.product_attribute_options_attribute = attribute
+
         super().__init__(
             data=data,
-            client=attribute.client,
+            client=client,
             endpoint=f'products/attributes/{attribute.attribute_code}/options',
-            fetched=fetched
+            fetched=fetched,
         )
+
         self.attribute = attribute
 
     def __repr__(self):
         return f"<AttributeOption {self.attribute.attribute_code}: {self.label}>"
 
     @property
-    def excluded_keys(self) -> List[str]:
-        return []
+    def mutable_keys(self) -> List[str]:
+        return [
+            'label',
+            'sort_order',
+            'is_default',
+            'store_labels',
+        ]
+
+    @property
+    def required_for_update_keys(self) -> List[str]:
+        """Return the keys that cannot be updated."""
+        return ['label', 'value']
+
+    @property
+    def uid(self) -> Union[str, int]:
+        if self._fetched:
+            return self.value
+
+        # the only identifier we have before is created is the value
+        return self.label
 
     @property
     def required_keys(self):
@@ -1322,14 +1407,12 @@ class AttributeOption(Model):
         self.mutable_data['label'] = value
 
     @property
-    @data_not_fetched_value(lambda self: self._value)
     def value(self) -> Optional[str]:
         return self._value
 
     @value.setter
-    @set_private_attr_after_setter
-    def value(self, value: Optional[str]) -> None:
-        self.mutable_data['value'] = value
+    def value(self, val: Optional[str]) -> None:
+        self._value = val
 
     @property
     @data_not_fetched_value(lambda self: self._sort_order)
@@ -1360,3 +1443,30 @@ class AttributeOption(Model):
     @set_private_attr_after_setter
     def store_labels(self, value: Optional[List[dict]]) -> None:
         self.mutable_data['store_labels'] = value
+
+    def refresh(self, scope: Optional[str] = None) -> bool:
+        """Updates object attributes in place using current data. Since this doesn't have a GET endpoint we need to fetch it again from the attribute"""
+        self.attribute.refresh(scope=scope)
+
+        if self._fetched:
+            refreshed_data = self.client.product_attribute_options.by_id(self.uid)
+        else:
+            refreshed_data = self.client.product_attribute_options.by_label(self.uid)
+
+
+        if refreshed_data:
+            self.clear(*self.cached)
+            self.set_attrs(refreshed_data.data)
+            self._fetched = True
+            self.logger.info(
+                f"Refreshed {self} on scope {self.get_scope_name(scope)}"
+            )
+            return True
+        else:
+            error_message = (f"Failed to fetch {self} on scope {self.get_scope_name(scope)} with UUID {self.uid}")
+
+            self.logger.error(error_message)
+            if self.client.strict_mode:
+                raise InstanceGetFailed(error_message)
+
+            return False

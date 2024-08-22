@@ -205,6 +205,14 @@ class OrderItemManager(Manager):
         """
         return self.add_criteria('product_id', product_id).execute_search()
 
+    def add_order_id_criteria(self, order_id: Union[int, str]) -> OrderItemManager:
+        """Manager for :class:`~.OrderItem` entries by product id.
+
+        :param order_id:We add the criteria for the order id so we can combo it with product / product skus
+        """
+        self.add_criteria('parent_item_id', order_id)
+        return self
+
     def by_category_id(self, category_id: Union[int, str], search_subcategories: bool = False) -> Optional[OrderItem | List[OrderItem]]:
         """Manager for :class:`~.OrderItem` entries by ``category_id``
 

@@ -25,7 +25,6 @@ class Invoice(Model):
             data=data,
             client=client,
             endpoint='invoices',
-            private_keys=True,
             fetched=fetched
         )
 

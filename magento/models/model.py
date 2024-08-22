@@ -8,6 +8,7 @@ import inspect
 from ..constants import ModelMethod
 from ..decorators import validate_method_for_model
 from ..exceptions import OperationNotAllowedError, MagentoError, InstanceDeleteFailed, InstanceUpdateFailed, InstanceGetFailed
+from ..utils import get_payload_prefix
 
 if TYPE_CHECKING:
     from magento.managers import Manager
@@ -28,8 +29,14 @@ class Model(ABC):
     DOCUMENTATION: str = None  #: Link to the Official Magento 2 API documentation for the endpoint wrapped by the Model
     IDENTIFIER: str = None  #: The API response field that the endpoint's :attr:`~.Model.uid` comes from
     ALLOWED_METHODS = [ModelMethod.GET] # get is the default method. But we can customize models to allow certain model methods
+    PAYLOAD_PREFIX = None # the key of the payload where the data goes. If missing we will use utils.get_payload_prefix to get it
 
-    def __init__(self, data: dict, client: clients.Client, endpoint: str, private_keys: bool = True, fetched: bool = False):
+    def __init__(self, data: dict,
+                 client: clients.Client,
+                 endpoint: str,
+                 fetched: bool = False,
+                 list_endpoint: Optional[str] = None
+                 ):
         """Initialize a :class:`Model` object from an API response and the ``endpoint`` that it came from
 
         ...
@@ -67,17 +74,18 @@ class Model(ABC):
         self.client = client
         self.endpoint = endpoint
         self.logger = client.logger
-        self.set_attrs(data, private_keys=private_keys)
+        self.set_attrs(data)
 
-    def set_attrs(self, data: dict, private_keys: bool = True) -> None:
+        # most of the models have the same endpoint for the list but some as attribute sets have another endpoint
+        self.list_endpoint = list_endpoint if list_endpoint is not None else endpoint
+
+    def set_attrs(self, data: dict) -> None:
         """Initializes object attributes using the JSON from an API response as the data source
 
         Called at the time of object initialization, but can also be used to update the source data and
         reinitialize the attributes without creating a new object
 
         :param data: the API response JSON to use as the object source data
-        :param private_keys: if set to True, will set the :attr:`~.excluded_keys` as private attributes
-            (prefixed with ``__``) instead of fully excluding them
 
         .. admonition:: **Private Keys Clarification**
            :class: info
@@ -85,10 +93,9 @@ class Model(ABC):
            Let's say that ``"status"`` is in the :attr:`~.excluded_keys`
 
            * No matter what, the ``status`` attribute will not be set on the :class:`Model`
-           * If ``private_keys==True``, the ``__status`` attribute will be set (using the ``status`` data)
-           * If ``private_keys==False``, the data from ``status`` is completely excluded
         """
 
+        private_keys = len(self.excluded_keys)
         missing_keys = set(self.required_keys) - set(data)
 
         if isinstance(self, APIResponse):
@@ -136,22 +143,20 @@ class Model(ABC):
         self.data = data
 
     @property
-    @abstractmethod
     def excluded_keys(self) -> List[str]:
         """API response keys that shouldn't be set as object attributes by :meth:`~.set_attrs`
 
         :returns: list of API response keys that shouldn't be set as attributes
         """
-        pass
+        return []
 
     @property
     def required_keys(self) -> List[str]:
         """API response keys that must be present in the data
-        By default the identifier is required
 
         :returns: list of API response keys that must be present
         """
-        return [self.IDENTIFIER]
+        return []
 
     @property
     def mutable_keys(self) -> List[str]:
@@ -190,7 +195,7 @@ class Model(ABC):
 
         :returns: a :class:`~.Manager` or subclass, depending on the ``endpoint``
         """
-        return self.client.manager(self.endpoint)
+        return self.client.manager(self.list_endpoint)
 
     def parse(self, response: dict) -> Model:
         """Uses the instance's corresponding :class:`~.Manager` to parse an API response
@@ -200,7 +205,7 @@ class Model(ABC):
         """
         return self.query_endpoint().parse(response)
 
-    def refresh(self, scope: Optional[str] = None, force_refresh: bool = True) -> bool:
+    def refresh(self, scope: Optional[str] = None) -> bool:
         """Updates object attributes in place using current data from the :meth:`~.data_endpoint`
 
         .. hint:: :meth:`~.refresh` can be used to switch the scope of the source data
@@ -219,12 +224,7 @@ class Model(ABC):
                 Refreshed <Magento Product: sku42> on scope all
 
         :param scope: the scope to send the request on; uses the :attr:`.Client.scope` if not provided
-        :param force_refresh: override cliend stop refresh
         """
-        if self.client.stop_refresh and not force_refresh:
-            self.logger.info("Refresh process is stopped by the client.")
-            return True
-
         url = self.data_endpoint(scope)
         response = self.client.get(url)
 
@@ -261,17 +261,16 @@ class Model(ABC):
         self.mutable_data = {}
 
     @validate_method_for_model(ModelMethod.UPDATE)
-    def save(self, payload_prefix: Optional[str] = None, add_save_options: bool = False, scope: Optional[str] = None) -> bool:
+    def save(self, add_save_options: bool = False, scope: Optional[str] = None, refresh: bool = True) -> bool:
         """Save the instance with the provided attribute data.
 
         This method compares the mutable initial values with the mutable data keys,
         builds the update payload, sends the PUT request to the appropriate endpoint,
         and refreshes the instance with the latest data if the save is successful.
 
-        :param payload_prefix: Optional prefix to add to the payload key. If not provided,
-                               the endpoint will be used to derive the prefix.
         :param add_save_options: Whether to add the 'save_options' flag to the payload.
         :param scope: The scope to send the request on; will use the default scope if not provided.
+        :param refresh: Decode of we perform refresh after create
         :returns: Boolean indicating the success of the save operation.
         """
 
@@ -290,9 +289,15 @@ class Model(ABC):
                 if key not in create_data:
                     create_data[key] = value
 
-            self.client.manager(self.endpoint).create(data=create_data, payload_prefix=payload_prefix, scope=scope)
-            self.refresh(scope)
-            self.clear_mutable_data()
+            instance = self.client.manager(self.endpoint).create(data=create_data, scope=scope)
+
+            if instance:
+                self.set_attrs(instance.data)
+            else:
+                if refresh:
+                    self.refresh(scope)
+                    self.clear_mutable_data()
+
             return True
 
         # Build the data by comparing mutable_initial_values with mutable_data
@@ -317,25 +322,25 @@ class Model(ABC):
             if key not in data and hasattr(self, key):
                 data[key] = getattr(self, key)
 
+        payload_prefix = get_payload_prefix(endpoint=self.endpoint, payload_prefix=self.PAYLOAD_PREFIX)
+
         # Add the prefix to the data
-        if payload_prefix:
-            payload = {payload_prefix: data}
-        else:
-            # Derive prefix from the endpoint, e.g., 'products' -> 'product'
-            payload_prefix = self.endpoint.rstrip('s')
-            payload = {payload_prefix: data}
+        payload = {payload_prefix: data}
 
         # Add save options if needed
         if add_save_options:
             payload['save_options'] = True
+
+        payload = self.enchance_payload(payload)
 
         # Send the PUT request
         url = self.data_endpoint(scope)
         response = self.client.put(url, payload)
 
         if response.ok:
-            self.refresh(scope)
-            self.clear_mutable_data()
+            if refresh:
+                self.refresh(scope)
+                self.clear_mutable_data()
             self.logger.info(f'{self.__class__.__name__} with data: {data} was successfully updated.')
             return True
         else:
@@ -447,6 +452,10 @@ class Model(ABC):
         """Returns the appropriate scope name to use for logging messages"""
         return scope or 'default' if scope is not None else self.client.scope or 'default'
 
+    def enchance_payload(self, payload):
+        """Method that allow override to the create payload"""
+        return payload
+
 
 class APIResponse(Model):
 
@@ -465,7 +474,6 @@ class APIResponse(Model):
             data=data,
             client=client,
             endpoint=endpoint,
-            private_keys=False,
             fetched=fetched
         )
 
@@ -492,3 +500,23 @@ class APIResponse(Model):
         else:
             self.logger.info(
                 f'Unable to determine uid field for API response from "{self.endpoint}"')
+
+class FetchedOnlyModel(Model):
+    """
+    A subclass of Model that cannot be directly instantiated for creation.
+
+    We can create this model only by the manager create method. This model is both stand alone but crete depends on other models.
+    Ex. Shipment that it's own get / search and many more apis but the create depends on Order and OrderItems.
+    """
+
+    def __init__(self, data: dict, client: clients.Client, endpoint: str, fetched: bool = False, list_endpoint: Optional[str] = None):
+        """Initialize a NonInitiableModel object, ensuring it cannot be created directly."""
+        if not fetched:
+            raise OperationNotAllowedError(self.client, 'INIT', self.__class__.__name__)
+
+        super().__init__(data, client, endpoint, fetched=fetched, list_endpoint=list_endpoint)
+
+    @classmethod
+    def create(cls, *args, **kwargs):
+        """Custom create method to handle specific creation logic."""
+        raise NotImplementedError(f"{cls.__name__} must be created using a custom method.")

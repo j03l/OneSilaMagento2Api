@@ -2,9 +2,13 @@ from __future__ import annotations
 import re
 from functools import cached_property
 from typing import Union, Type, Iterable, List, Optional, Dict, TYPE_CHECKING
+
+import requests
+
 from ..models import Model, APIResponse
 from ..exceptions import MagentoError, InstanceCreateFailed
 from .. import clients
+from ..utils import get_payload_prefix
 
 if TYPE_CHECKING:
     from typing_extensions import Self
@@ -17,7 +21,7 @@ class Manager:
     .. tip:: See https://developer.adobe.com/commerce/webapi/rest/use-rest/performing-searches/ for official docs
     """
 
-    def __init__(self, endpoint: str, client: Client, model: Type[Model] = APIResponse):
+    def __init__(self, endpoint: str, client: Client, model: Type[Model] = APIResponse, create_endpoint: Optional[str] = None):
         """Initialize a Manager object
 
         :param endpoint: the base search API endpoint (for example, ``orders``)
@@ -45,6 +49,10 @@ class Manager:
         self.per_page = 100
         # total pages number
         self.total_pages = None
+        # some managers have another endpoints for create but most of it will not
+        self.create_endpoint = endpoint
+        if create_endpoint:
+            self.create_endpoint = create_endpoint
 
     def add_criteria(self, field, value, condition='eq', **kwargs) -> Self:
         """Add criteria to the search query
@@ -437,12 +445,42 @@ class Manager:
         """
         return self.Model(data=data, client=self.client)
 
-    def create(self, data: dict, payload_prefix: Optional[str] = None, scope: Optional[str] = None) -> Optional[Model]:
+    def parse_create_id_response(self, id: int) -> Optional[Model]:
+        """
+        Method to parse the create response for when the response is an  id.
+
+        This care be override in managers like attribute options or
+        """
+        return self.by_id(id)
+
+    def parse_create_response(self, response: requests.Response) -> Optional[Model]:
+        """
+        Handles the response from a create operation.
+
+        :param response: The response object from the create request.
+        :return: The parsed Model instance if successful, otherwise None.
+        """
+        if response.ok:
+            try:
+                json_data = response.json()
+
+                if isinstance(json_data, dict):
+                    # If the response is a dict, parse it as usual
+                    return self.parse(json_data)
+
+                elif isinstance(json_data, int) or (isinstance(json_data, str) and json_data.isdigit()):
+                    # If the response is just an ID, use by_id to retrieve the full instance
+                    return self.parse_create_id_response(int(json_data))
+
+            except ValueError as e:
+                self.client.logger.error(f"Failed to parse JSON response: {response.content}. Initial error: {str(e)}")
+                return None
+
+    def create(self, data: dict, scope: Optional[str] = None) -> Optional[Model]:
         """
         Create a new instance with the provided model instance.
 
         :param data: The dict instance containing attributes for the new instance.
-        :param payload_prefix: Optional prefix for the payload (defaults to derived from the endpoint).
         :param scope: Optional scope for the request.
         :return: The newly created Model instance.
         """
@@ -464,21 +502,21 @@ class Manager:
 
                 mutable_data[key] = val
 
+        payload_prefix = get_payload_prefix(endpoint=self.create_endpoint, payload_prefix=instance.PAYLOAD_PREFIX)
+
         # Construct the final payload with the prefix
-        if payload_prefix:
-            payload = {payload_prefix: mutable_data}
-        else:
-            # Derive prefix from the endpoint, e.g., 'products' -> 'product'
-            payload_prefix = self.endpoint.rstrip('s')
-            payload = {payload_prefix: mutable_data}
+        payload = {payload_prefix: mutable_data}
+
+        # for the models that use skeleton we need to set it on the root
+        if 'skeleton_id' in mutable_data:
+            payload['skeletonId'] = mutable_data.pop('skeleton_id')
 
         # Send the POST request to create the instance
-        url = self.client.url_for(self.endpoint, scope=scope)
+        url = self.client.url_for(self.create_endpoint, scope=scope)
         response = self.client.post(url, payload)
 
         if response.ok:
-            # Parse and return the newly created instance
-            return self.parse(response.json())
+            return self.parse_create_response(response)
         else:
             error_message = (
                 f'Failed to create {self.Model.__name__} with status code {response.status_code}.\n'
@@ -494,7 +532,6 @@ class Manager:
         self,
         identifier: str,
         data: dict,
-        payload_prefix: Optional[str] = None,
         scope: Optional[str] = None,
     ) -> Model:
         """
@@ -502,7 +539,6 @@ class Manager:
 
         :param identifier: The unique identifier for the instance (e.g., `sku` for a product).
         :param data: Attributes to set on the instance if it needs to be created.
-        :param payload_prefix: Optional prefix for the payload (defaults to derived from the endpoint).
         :param scope: Optional scope for the request.
         :return: The retrieved or newly created Model instance.
         """
@@ -515,7 +551,7 @@ class Manager:
 
         # If not found, create a new instance
         self.client.logger.info(f'{self.Model.__name__} with identifier: {identifier} not found. Creating new instance.')
-        return self.create(data=data, payload_prefix=payload_prefix, scope=scope)
+        return self.create(data=data, scope=scope)
 
 
 class MinimalManager(Manager):

@@ -1,9 +1,15 @@
 from __future__ import annotations
+
+import base64
 from typing import Union, Iterable, List, Optional, TYPE_CHECKING
 
+import requests
+
 from .manager import Manager, MinimalManager
-from ..models import Model, APIResponse, Product, Category, ProductAttribute
+from ..models import Model, APIResponse, Product, Category, ProductAttribute, MediaEntry
+from ..models.attribute_set import AttributeSet
 from ..models.product import AttributeOption
+from ..utils import mime_type
 
 if TYPE_CHECKING:
     from . import Client
@@ -110,6 +116,90 @@ class ProductManager(Manager):
         if product := self.by_sku(sku):
             return product.stock
 
+    def by_attribute_set(self, attribute_set: AttributeSet) -> Optional[List[Product]]:
+        """Retrieve all :class:`~.Product`s associated with a given :class:`~.AttributeSet`
+
+        :param attribute_set: the attribute set instance to filter products by
+        :returns: a list of :class:`~.Product` objects associated with the attribute set
+        """
+        return self.add_criteria(
+            field='attribute_set_id',
+            value=attribute_set.attribute_set_id
+        ).execute_search()
+
+    def get_media(self, product: Product, media_id) -> Optional[MediaEntry]:
+        url = self.client.url_for(f"products/{product.encoded_sku}/media/{media_id}")
+
+        response = self.client.get(url=url)
+        if response.ok:
+            return MediaEntry(product=product, entry=response.json(), fetched=True)
+
+        return  None
+
+
+class MediaEntryManager(MinimalManager):
+    """
+    :class:`MinimalManager` subclass for managing media entries in the ``products/{product_sku}/media`` endpoint.
+
+    This manager handles retrieving, creating, and managing media entries for a specific product.
+    """
+
+    def __init__(self, client: Client, product: Product):
+        """Initialize a :class:`MediaEntryManager`
+
+        :param product: The :class:`Product` instance to which the media entries belong.
+        """
+        # Initialize the MinimalManager with the appropriate endpoint and model
+        super().__init__(
+            endpoint=f"products/{product.encoded_sku}/media",
+            client=client,
+            model=MediaEntry
+        )
+        self.product = product
+
+    def __repr__(self):
+        return f"<MediaEntryManager for {self.product.sku}>"
+
+    def by_id(self, media_id: int) -> Optional[MediaEntry]:
+        """Retrieve a MediaEntry by its ID.
+
+        :param media_id: The ID of the media entry.
+        """
+        return self.client.products.get_media(product=self.product, media_id=media_id)
+
+    def all(self) -> List[MediaEntry]:
+        """Retrieve all media entries for the Product."""
+        return self.product.media_gallery_entries
+
+    def get_instance_for_create(self, data) -> Model:
+        """
+        Method to get the instance to be created. It allows override so we don't need to override the whole create.
+
+        :param data: The dict instance containing attributes for the new instance.
+        :return: A new MediaEntry instance.
+        """
+        # Handle the image processing logic
+        image_url = data.pop('image_url')
+        if not image_url:
+            raise ValueError("Image URL must be provided when creating a new media entry.")
+
+        filename = image_url.split('/')[-1]
+        if image_url.startswith('http'):
+            img_content = requests.get(image_url).content
+        else:
+            with open(image_url, 'rb') as f:
+                img_content = f.read()
+
+        instance = MediaEntry(entry=data,  product=self.product, fetched=False)
+
+        instance.mutable_data['content'] = {
+            "base64_encoded_data": base64.b64encode(img_content).decode('utf-8'),
+            "type": mime_type(filename),
+            "name": filename
+        }
+
+        return instance
+
 
 class ProductAttributeManager(Manager):
     """:class:`ManagerQuery` subclass for the ``products/attributes`` endpoint"""
@@ -144,14 +234,21 @@ class ProductAttributeManager(Manager):
         """Retrieve a list of all available :class:`~.ProductAttribute` types"""
         return self.client.manager(f'{self.endpoint}/types').execute_search()
 
-    def create(self, data: dict, payload_prefix: Optional[str] = None, scope: Optional[str] = None) -> Optional[Model]:
-        if payload_prefix != 'attribute':
-            payload_prefix = 'attribute'
-        return super().create(data=data, payload_prefix=payload_prefix, scope=scope)
+
 
 
 class ProductAttributeOptionManager(MinimalManager):
-    """:class:`MinimalManager` subclass for managing attribute options in the ``products/attributes/{attribute_code}/options`` endpoint."""
+    """
+    :class:`MinimalManager` subclass for managing attribute options in the ``products/attributes/{attribute_code}/options`` endpoint.
+
+    https://github.com/magento/magento2/issues/26374
+    For some reason the api for options will only give value and label. Will not give the sort_order and the store_labels. They say is not a bug
+    And you need to have the store code scope in order to get all. Honestly I think the peroson that replyied didn't understand the issue so
+    for now we will update these fields 'blindly' (with no way to know if they are really updated).
+
+    By just looking into the admin frotnend it seems to work.
+
+    """
 
     def __init__(self, client: Client, attribute: ProductAttribute):
         """Initialize a :class:`ProductAttributeOptionManager`
@@ -160,7 +257,7 @@ class ProductAttributeOptionManager(MinimalManager):
         """
         # Initialize the MinimalManager with the appropriate endpoint and model
         super().__init__(
-            endpoint=f"V1/products/attributes/{attribute.attribute_code}/options",
+            endpoint=f"products/attributes/{attribute.attribute_code}/options",
             client=client,
             model=AttributeOption
         )
@@ -180,6 +277,17 @@ class ProductAttributeOptionManager(MinimalManager):
         self.client.logger.info(f"No option found with label: {label} for {self.attribute}")
         return None
 
+    def by_id(self, id: str) -> Optional[AttributeOption]:
+        """Retrieve an AttributeOption by its label.
+
+        :param label: The label of the option.
+        """
+        for option in self.attribute.options:
+            if option.value == id:
+                return option
+        self.client.logger.info(f"No option found with label: {id} for {self.attribute}")
+        return None
+
     def all(self) -> List[AttributeOption]:
         """Retrieve all options for the ProductAttribute."""
         return self.attribute.options
@@ -187,3 +295,9 @@ class ProductAttributeOptionManager(MinimalManager):
     def get_default_get_method(self, identifier: str) -> Optional[AttributeOption]:
         """Override the default get method to retrieve an option by label."""
         return self.by_label(identifier)
+
+    def get_instance_for_create(self, data) -> Model:
+        """
+        Override the parent one
+        """
+        return AttributeOption(data=data, client=self.client, attribute=self.attribute)

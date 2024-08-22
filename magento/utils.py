@@ -5,7 +5,7 @@ import logging
 import requests
 import functools
 
-from typing import Union, List, Type
+from typing import Union, List, Type, Optional
 from logging import Logger, FileHandler, StreamHandler, Handler
 
 
@@ -54,6 +54,40 @@ def get_agent(index=0) -> str:
     """Returns a single user agent string from the specified index of the AGENTS list"""
     return get_agents()[index]  # Specify index only if you hardcode more than 1
 
+def snake_to_camel(snake_str: str) -> str:
+    components = snake_str.split('_')
+    return components[0] + ''.join(x.title() for x in components[1:])
+
+def get_payload_prefix(endpoint: str, payload_prefix: Optional[str] = None) ->str:
+
+    if payload_prefix:
+        return payload_prefix
+
+    # if the payload_prefix was not given we contract it by using the last part after '/' and removing the finals s
+    # so products become product
+    # products/attributes/{attribute.attribute_code}/options -> option
+    # if it's a special one we can override it be specifying it
+    # Split the endpoint by '/' and get the last part
+    last_segment = endpoint.split('/')[-1]
+    # Strip the trailing 's' if present
+    payload_prefix = last_segment.rstrip('s').replace('-', '_')
+
+    return snake_to_camel(payload_prefix)
+
+
+def mime_type(filename):
+    extension = filename.split('.')[-1].lower()
+
+    if extension in ['jpg', 'jpeg']:
+        mime = 'image/jpeg'
+    elif extension in ['png']:
+        mime = 'image/png'
+    elif extension in ['gif']:
+        mime = 'image/gif'
+    else:
+        raise Exception('Unkown mime-type for extionsion {0} in {1}'.format(extension, filename))
+
+    return mime
 
 class LoggerUtils:
     """Utility class that simplifies access to logger handler info"""

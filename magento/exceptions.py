@@ -118,3 +118,12 @@ class InstanceDeleteFailed(Exception):
     def __init__(self, message: str):
         super().__init__(message)
         self.message = message
+
+
+class LockedAttributeError(Exception):
+    """Raised when an attribute is locked and cannot be modified or deleted."""
+    pass
+
+class GeneralApiError(Exception):
+    """Raised for general API errors."""
+    pass

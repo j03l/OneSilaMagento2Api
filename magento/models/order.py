@@ -4,6 +4,8 @@ from functools import cached_property
 from . import Model
 import copy
 
+from ..exceptions import MagentoError
+
 if TYPE_CHECKING:
     from magento import Client
     from . import Product, Invoice, Customer
@@ -16,6 +18,15 @@ class Order(Model):
     DOCUMENTATION = 'https://adobe-commerce.redoc.ly/2.3.7-admin/tag/orders'
     IDENTIFIER = 'entity_id'
 
+    # Status Constants
+    STATUS_CANCELED = 'canceled'
+    STATUS_CLOSED = 'closed'
+    STATUS_COMPLETE = 'complete'
+    STATUS_HOLDED = 'holded'
+    STATUS_PENDING = 'pending'
+    STATUS_PROCESSING = 'processing'
+    STATUS_UNHOLDED = 'unhold'  # Treated as a status for simplicity
+
     def __init__(self, data: dict, client: Client, fetched: bool = False):
         """Initialize an Order object using an API response from the ``orders`` endpoint
 
@@ -26,12 +37,133 @@ class Order(Model):
             data=data,
             client=client,
             endpoint='orders',
-            private_keys=True,
             fetched=fetched
         )
 
+    def update_status(self, status: str, comment: Optional[str] = None, notify: bool = False, visible_on_front: bool = False) -> bool:
+        """
+        Update the order status, or perform an action (cancel, hold, unhold) treated as statuses.
+
+        :param status: The new status to set. Must be one of the predefined status constants.
+        :param comment: A comment to add to the order's status history.
+        :param notify: Whether to notify the customer.
+        :param visible_on_front: Whether the comment is visible on the front-end.
+        :return: Boolean indicating whether the operation was successful.
+        """
+        if status not in [
+            self.STATUS_CANCELED, self.STATUS_CLOSED, self.STATUS_COMPLETE,
+            self.STATUS_HOLDED, self.STATUS_PENDING, self.STATUS_PROCESSING,
+            self.STATUS_UNHOLDED
+        ]:
+            raise ValueError("Invalid status provided.")
+
+        # Determine the action based on the status
+        if status == self.STATUS_CANCELED:
+            return self._perform_action('cancel')
+        elif status == self.STATUS_HOLDED:
+            return self._perform_action('hold')
+        elif status == self.STATUS_UNHOLDED:
+            return self._perform_action('unhold')
+        else:
+            return self._update_status_via_comment(status, comment, notify, visible_on_front)
+
+    def _perform_action(self, action: str) -> bool:
+        """Performs the specified action on the order (cancel, hold, unhold)."""
+        url = f'{self.data_endpoint()}/{action}'
+        response = self.client.post(url)
+        if response.ok:
+            self.refresh()
+            self.logger.info(f"Order {self.number} successfully {action}ed.")
+            return True
+        else:
+            self.logger.error(
+                f"Failed to {action} order {self.number} with status code {response.status_code}.\n"
+                f"Message: {MagentoError.parse(response)}"
+            )
+            return False
+
+    def _update_status_via_comment(self, status: str, comment: Optional[str], notify: bool, visible_on_front: bool) -> bool:
+        """Updates the order status by adding a comment."""
+        payload = {
+            "statusHistory": {
+                "status": status,
+                "comment": comment or f"Status updated to {status}.",
+                "parentId": self.id,
+                "isCustomerNotified": 1 if notify else 0,
+                "isVisibleOnFront": 1 if visible_on_front else 0
+            }
+        }
+        url = f'{self.data_endpoint()}/comments'
+        response = self.client.post(url, payload)
+        if response.ok:
+            self.refresh()
+            self.logger.info(f"Order {self.number} status updated to {status}.")
+            return True
+        else:
+            self.logger.error(
+                f"Failed to update status of order {self.number} with status code {response.status_code}.\n"
+                f"Message: {MagentoError.parse(response)}"
+            )
+            return False
+
     def __repr__(self):
         return f'<Magento Order: #{self.number} placed on {self.created_at}>'
+
+    def update_status(self, status: Optional[str] = None, action: Optional[str] = None, comment: Optional[str] = None, notify: bool = False,
+                      visible_on_front: bool = False) -> bool:
+        """
+        Update the order status, or perform an action (cancel, hold, unhold).
+
+        :param status: The new status to set. Ignored if action is provided.
+        :param action: The action to perform: 'cancel', 'hold', 'unhold'.
+        :param comment: A comment to add to the order's status history.
+        :param notify: Whether to notify the customer.
+        :param visible_on_front: Whether the comment is visible on the front-end.
+        :return: Boolean indicating whether the operation was successful.
+        """
+        if action:
+            # Determine the endpoint based on the action
+            if action not in ['cancel', 'hold', 'unhold']:
+                raise ValueError("Invalid action. Must be 'cancel', 'hold', or 'unhold'.")
+            url = f'{self.data_endpoint()}/{action}'
+            response = self.client.post(url)
+            if response.ok:
+                self.refresh()
+                self.logger.info(f"Order {self.number} successfully {action}ed.")
+                return True
+            else:
+                self.logger.error(
+                    f"Failed to {action} order {self.number} with status code {response.status_code}.\n"
+                    f"Message: {MagentoError.parse(response)}"
+                )
+                return False
+
+        elif status:
+            # Update the status by adding a comment
+            payload = {
+                "statusHistory": {
+                    "status": status,
+                    "comment": comment or f"Status updated to {status}.",
+                    "parentId": self.id,
+                    "isCustomerNotified": 1 if notify else 0,
+                    "isVisibleOnFront": 1 if visible_on_front else 0
+                }
+            }
+            url = f'{self.data_endpoint()}/comments'
+            response = self.client.post(url, payload)
+            if response.ok:
+                self.refresh()
+                self.logger.info(f"Order {self.number} status updated to {status}.")
+                return True
+            else:
+                self.logger.error(
+                    f"Failed to update status of order {self.number} with status code {response.status_code}.\n"
+                    f"Message: {MagentoError.parse(response)}"
+                )
+                return False
+
+        else:
+            raise ValueError("Either 'status' or 'action' must be provided.")
 
     @property
     def excluded_keys(self) -> List[str]:
