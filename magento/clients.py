@@ -5,7 +5,12 @@ import requests
 from functools import cached_property
 from typing import Optional, Dict, List
 
+from requests import Session
+from requests.adapters import HTTPAdapter
+from urllib3 import Retry
+
 from .constants import Scope, StoreCode, AuthenticationMethod
+from .decorators import jsondecode_error_retry
 from .managers.attribute_set import AttributeSetManager
 from .managers.product import ProductAttributeOptionManager, MediaEntryManager
 from .utils import MagentoLogger, get_agent, parse_domain
@@ -107,9 +112,21 @@ class Client:
         # the current number of authentication retries
         self.authentication_retries = 0
 
+        self.session = Session()
+        retries = Retry(
+            total=3,
+            backoff_factor=1,
+            status_forcelist=[502, 503, 504],
+            allowed_methods={'POST', 'PUT'},
+        )
+        adapter = HTTPAdapter(max_retries=retries)
+        self.session.mount('https://', adapter)
 
         if login:
             self.authenticate()
+
+    def __exit__(self, exc_type, exc_val, exc_tb):
+        self.session.close()
 
     @classmethod
     def new(cls) -> Client:
@@ -383,6 +400,7 @@ class Client:
                 self.USER_CREDENTIALS['username'], self.domain)
             raise AuthenticationError(self, msg=msg, response=response)
 
+    @jsondecode_error_retry()
     def request(self, method: str, url: str, payload: dict = None) -> requests.Response:
         """Sends an authorized API request. Used for all internal requests
 
@@ -394,10 +412,10 @@ class Client:
         """
         method = method.upper()
         if method in ('GET', 'DELETE'):
-            response = requests.request(method, url, headers=self.headers)
+            response = self.session.request(method, url, headers=self.headers)
         elif method in ('POST', 'PUT'):
             if payload:
-                response = requests.request(method, url, json=payload, headers=self.headers)
+                response = self.session.request(method, url, json=payload, headers=self.headers)
             else:
                 raise ValueError('Must provide a non-empty payload')
         else:
