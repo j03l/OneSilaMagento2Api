@@ -33,7 +33,6 @@ class Client:
             scope: Optional[str] = '',
             local: bool = False,
             user_agent: Optional[str] = None,
-            token: Optional[str] = None,
             log_level: str = 'INFO',
             login: bool = True,
             strict_mode: bool = True,
@@ -62,7 +61,6 @@ class Client:
         :param scope: the store view scope to :meth:`~search` and make requests on
         :param local: whether the Magento store is hosted locally
         :param user_agent: the user agent to use in requests
-        :param token: an existing access token
         :param log_level: the logging level for logging to stdout
         :param login: if ``True``, calls :meth:`~.authenticate` upon initialization
         :param kwargs: see below
@@ -91,8 +89,6 @@ class Client:
         self.api_key: Optional[str] = api_key
         #: Authentication method
         self.authentication_method: AuthenticationMethod = authentication_method
-        #: The API access token
-        self.ACCESS_TOKEN: str = token
         #: The Magento store domain
         self.domain: str = domain
         #: The store view code to request/update data on
@@ -410,6 +406,7 @@ class Client:
         :param url: the url to send the request to
         :param payload: the JSON payload for the request (if the method is ``POST`` or ``PUT``)
         """
+
         method = method.upper()
         if method in ('GET', 'DELETE'):
             response = self.session.request(method, url, headers=self.headers)
@@ -460,6 +457,7 @@ class Client:
         """
         return {
             'Authorization': f'Bearer {self.token}',
+            'Content-Type': 'application/json',
             'User-Agent': self.user_agent
         }
 

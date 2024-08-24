@@ -277,13 +277,14 @@ class ProductAttributeOptionManager(MinimalManager):
         self.client.logger.info(f"No option found with label: {label} for {self.attribute}")
         return None
 
-    def by_id(self, id: str) -> Optional[AttributeOption]:
+    def by_id(self, id: str | int) -> Optional[AttributeOption]:
         """Retrieve an AttributeOption by its label.
 
         :param label: The label of the option.
         """
+        self.attribute.refresh()
         for option in self.attribute.options:
-            if option.value == id:
+            if int(option.value) == int(id):
                 return option
         self.client.logger.info(f"No option found with label: {id} for {self.attribute}")
         return None

@@ -1,7 +1,7 @@
 from __future__ import annotations
 from typing import TYPE_CHECKING, Optional, List
 from functools import cached_property
-from . import Model
+from . import ImmutableModel
 import copy
 
 from ..exceptions import MagentoError
@@ -11,7 +11,7 @@ if TYPE_CHECKING:
     from . import Product, Invoice, Customer
 
 
-class Order(Model):
+class Order(ImmutableModel):
 
     """Wrapper for the ``orders`` endpoint"""
 
@@ -25,7 +25,7 @@ class Order(Model):
     STATUS_HOLDED = 'holded'
     STATUS_PENDING = 'pending'
     STATUS_PROCESSING = 'processing'
-    STATUS_UNHOLDED = 'unhold'  # Treated as a status for simplicity
+    STATUS_UNHOLDED = 'unhold'
 
     def __init__(self, data: dict, client: Client, fetched: bool = False):
         """Initialize an Order object using an API response from the ``orders`` endpoint
@@ -70,7 +70,7 @@ class Order(Model):
     def _perform_action(self, action: str) -> bool:
         """Performs the specified action on the order (cancel, hold, unhold)."""
         url = f'{self.data_endpoint()}/{action}'
-        response = self.client.post(url)
+        response = self.client.post(url, {'id': self.uid})
         if response.ok:
             self.refresh()
             self.logger.info(f"Order {self.number} successfully {action}ed.")
@@ -109,61 +109,6 @@ class Order(Model):
     def __repr__(self):
         return f'<Magento Order: #{self.number} placed on {self.created_at}>'
 
-    def update_status(self, status: Optional[str] = None, action: Optional[str] = None, comment: Optional[str] = None, notify: bool = False,
-                      visible_on_front: bool = False) -> bool:
-        """
-        Update the order status, or perform an action (cancel, hold, unhold).
-
-        :param status: The new status to set. Ignored if action is provided.
-        :param action: The action to perform: 'cancel', 'hold', 'unhold'.
-        :param comment: A comment to add to the order's status history.
-        :param notify: Whether to notify the customer.
-        :param visible_on_front: Whether the comment is visible on the front-end.
-        :return: Boolean indicating whether the operation was successful.
-        """
-        if action:
-            # Determine the endpoint based on the action
-            if action not in ['cancel', 'hold', 'unhold']:
-                raise ValueError("Invalid action. Must be 'cancel', 'hold', or 'unhold'.")
-            url = f'{self.data_endpoint()}/{action}'
-            response = self.client.post(url)
-            if response.ok:
-                self.refresh()
-                self.logger.info(f"Order {self.number} successfully {action}ed.")
-                return True
-            else:
-                self.logger.error(
-                    f"Failed to {action} order {self.number} with status code {response.status_code}.\n"
-                    f"Message: {MagentoError.parse(response)}"
-                )
-                return False
-
-        elif status:
-            # Update the status by adding a comment
-            payload = {
-                "statusHistory": {
-                    "status": status,
-                    "comment": comment or f"Status updated to {status}.",
-                    "parentId": self.id,
-                    "isCustomerNotified": 1 if notify else 0,
-                    "isVisibleOnFront": 1 if visible_on_front else 0
-                }
-            }
-            url = f'{self.data_endpoint()}/comments'
-            response = self.client.post(url, payload)
-            if response.ok:
-                self.refresh()
-                self.logger.info(f"Order {self.number} status updated to {status}.")
-                return True
-            else:
-                self.logger.error(
-                    f"Failed to update status of order {self.number} with status code {response.status_code}.\n"
-                    f"Message: {MagentoError.parse(response)}"
-                )
-                return False
-
-        else:
-            raise ValueError("Either 'status' or 'action' must be provided.")
 
     @property
     def excluded_keys(self) -> List[str]:
@@ -319,7 +264,7 @@ class Order(Model):
         return sum(item.net_qty_ordered for item in self.items)
 
 
-class OrderItem(Model):
+class OrderItem(ImmutableModel):
 
     """Wrapper for the ``order/items`` endpoint"""
 

@@ -13,50 +13,51 @@ class TestLocalClientUrlFor(unittest.TestCase):
 
     @classmethod
     def setUpClass(self) -> None:
-        self.api = Client(domain, user, pw, local=True, login=False)
+        local = os.getenv('MAGENTO_LOCAL', 'False').lower() in ('True', 'true', '1', 't')
+        self.api = Client(domain, user, pw, local=local, login=False)
 
     def test_base_url(self):
-        self.assertEqual(self.api.BASE_URL, f'http://{domain}/rest/V1/')
+        self.assertEqual(self.api.BASE_URL, f'{domain}/rest/V1/')
 
     def test_url_for_none_none(self):
         self.api.scope = None
-        self.assertEqual(self.api.url_for('products'), f'http://{domain}/rest/V1/products')
+        self.assertEqual(self.api.url_for('products'), f'{domain}/rest/V1/products')
 
     def test_url_for_none_null(self):
         self.api.scope = None
-        self.assertEqual(self.api.url_for('products', ""), f'http://{domain}/rest/V1/products')
+        self.assertEqual(self.api.url_for('products', ""), f'{domain}/rest/V1/products')
         self.assertEqual(self.api.scope, None)
 
     def test_url_for_none_scope(self):
         self.api.scope = None
-        self.assertEqual(self.api.url_for('products', "en"), f'http://{domain}/rest/en/V1/products')
+        self.assertEqual(self.api.url_for('products', "en"), f'{domain}/rest/en/V1/products')
         self.assertEqual(self.api.scope, None)
 
     def test_url_for_null_none(self):
         self.api.scope = ""
-        self.assertEqual(self.api.url_for('products'), f'http://{domain}/rest/V1/products')
+        self.assertEqual(self.api.url_for('products'), f'{domain}/rest/V1/products')
 
     def test_url_for_null_null(self):
         self.api.scope = ""
-        self.assertEqual(self.api.url_for('products', ""), f'http://{domain}/rest/V1/products')
+        self.assertEqual(self.api.url_for('products', ""), f'{domain}/rest/V1/products')
 
     def test_url_for_null_scope(self):
         self.api.scope = ""
-        self.assertEqual(self.api.url_for('products', "en"), f'http://{domain}/rest/en/V1/products')
+        self.assertEqual(self.api.url_for('products', "en"), f'{domain}/rest/en/V1/products')
         self.assertEqual(self.api.scope, "")
 
     def test_url_for_scope_none(self):
         self.api.scope = "en"
-        self.assertEqual(self.api.url_for('products'), f'http://{domain}/rest/en/V1/products')
+        self.assertEqual(self.api.url_for('products'), f'{domain}/rest/en/V1/products')
 
     def test_url_for_scope_null(self):
         self.api.scope = "en"
-        self.assertEqual(self.api.url_for('products', ""), f'http://{domain}/rest/V1/products')
+        self.assertEqual(self.api.url_for('products', ""), f'{domain}/rest/V1/products')
         self.assertEqual(self.api.scope, "en")
 
     def test_url_for_scope_scope(self):
         self.api.scope = "en"
-        self.assertEqual(self.api.url_for('products', "fr"), f'http://{domain}/rest/fr/V1/products')
+        self.assertEqual(self.api.url_for('products', "fr"), f'{domain}/rest/fr/V1/products')
         self.assertEqual(self.api.scope, "en")
 
 

@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from functools import cached_property
 
-from . import FetchedOnlyModel, APIResponse
+from . import FetchedOnlyModel, APIResponse, ImmutableModel
 from typing import TYPE_CHECKING, Optional, List
 
 from ..constants import ModelMethod
@@ -11,7 +11,7 @@ if TYPE_CHECKING:
     from magento import Client
     from . import Order, OrderItem
 
-class Shipment(FetchedOnlyModel):
+class Shipment(FetchedOnlyModel, ImmutableModel):
     """A model representing a shipment, with methods to interact with shipment-specific API endpoints."""
 
     DOCUMENTATION = "https://adobe-commerce.redoc.ly/2.3.7-admin/tag/shipment"

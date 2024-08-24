@@ -1,14 +1,12 @@
 from __future__ import annotations
-from . import Model, Order, OrderItem, Product, Customer
+from . import ImmutableModel, Order, OrderItem, Product, Customer
 from typing import TYPE_CHECKING, Optional, List, Union
 from functools import cached_property
 
 if TYPE_CHECKING:
     from magento import Client
-    from magento.search import SearchQuery
 
-
-class Invoice(Model):
+class Invoice(ImmutableModel):
 
     """Wrapper for the ``invoices`` endpoint"""
 
@@ -62,7 +60,7 @@ class Invoice(Model):
                 if item['order_item_id'] in self.order.item_ids]
 
 
-class InvoiceItem(Model):
+class InvoiceItem(ImmutableModel):
 
     """Wraps an item entry of an :class:`Invoice`"""
 

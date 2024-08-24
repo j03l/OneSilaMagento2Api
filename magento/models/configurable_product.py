@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from functools import cached_property
 
-from . import Model, Product, ProductAttribute
+from . import ImmutableModel, Product, ProductAttribute
 from typing import TYPE_CHECKING, Optional, List
 
 from ..constants import ModelMethod
@@ -10,7 +10,7 @@ from ..constants import ModelMethod
 if TYPE_CHECKING:
     from magento import Client
 
-class ConfigurableProduct(Model):
+class ConfigurableProduct(ImmutableModel):
     """Wrapper for the `configurable-products` endpoint."""
 
     DOCUMENTATION = 'https://adobe-commerce.redoc.ly/2.3.7-admin/tag/configurable-products/'

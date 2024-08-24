@@ -1,6 +1,6 @@
 from __future__ import annotations
 import copy
-from . import Model, Product
+from . import ImmutableModel, Product
 from functools import cached_property
 from magento.exceptions import MagentoError
 from typing import TYPE_CHECKING, List, Optional, Set, Dict, Union
@@ -11,7 +11,7 @@ if TYPE_CHECKING:
     from . import Order, OrderItem, Invoice
 
 
-class Category(Model):
+class Category(ImmutableModel):
 
     """Wrapper for the ``categories`` endpoint"""
 

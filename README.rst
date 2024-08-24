@@ -169,7 +169,6 @@ A Python package that wraps and extends the Magento 2 REST API
 About MyMagento
 ~~~~~~~~~~~~~~~~~~~~
 
-
 .. raw:: html
 
    <table>
@@ -194,7 +193,7 @@ providing a more intuitive and user-friendly interface to access and update your
 
 
 MyMagento simplifies interaction with the Magento 2 REST API
-============================================================
+=================================================================
 
 If you've worked with the Magento 2 API, you'll know that not all endpoints are created equally.
 
@@ -204,8 +203,7 @@ variety of commonly needed API operations.
 ...
 
 Main Components
-==================================
-
+===============
 
 .. raw:: html
 
@@ -230,29 +228,28 @@ Main Components
    </table>
 
 
-
 .. raw:: html
 
    <table>
        <tr align="left">
            <th>
 
-🔍 The |.~.SearchQuery|_ and Subclasses
+🔍 The |.~.Manager|_ Subclasses
 
 .. raw:: html
 
    </th>
    <tr><td>
 
-* |.~.execute_search|_ a search query on any endpoint
-* Intuitive interface for `Building Custom Search Queries <https://my-magento.readthedocs.io/en/latest/interact-with-api.html#custom-queries>`_
-* All predefined methods retrieve data using only 1-2 API requests
+* Manages interaction with API endpoints
+* Allows executing searches, creating, and updating resources
+* Provides an intuitive interface for `Managing Resources <https://my-magento.readthedocs.io/en/latest/interact-with-api.html>`_
+* Supports advanced operations like `get_or_create`, simplifying workflows
 
 .. raw:: html
 
    </td></tr>
    </table>
-
 
 
 .. raw:: html
@@ -270,6 +267,8 @@ Main Components
 
 * Wrap all API responses in the package
 * Provide additional endpoint-specific methods to retrieve and update data
+* `FetchedOnlyModel` subclass can only be retrieved from the API, not created directly
+* `ImmutableModel` subclass cannot be modified after initialization and throws an error if `save()` is called
 
 .. raw:: html
 
@@ -280,53 +279,50 @@ Main Components
 ...
 
 Available Endpoints
-======================
+===================
 
 ``MyMagento`` is compatible with every |api_endpoint|_
 
-Endpoints are wrapped with a |.~.Model|_ and |.~.SearchQuery|_ subclass as follows:
-
+Endpoints are wrapped with a |.~.Model|_ and |.~.Manager|_ subclass as follows:
 
 .. csv-table::
-   :header: "**Endpoint**", "**Client Shortcut**", "|.~.SearchQuery|_ **Subclass**", "|.~.Model|_ **Subclass**"
+   :header: "**Endpoint**", "**Client Shortcut**", "|.~.Manager|_ **Subclass**", "|.~.Model|_ **Subclass**"
 
-   "``orders``", "|..Client.orders|_", "|.~.OrderSearch|_", "|.~.Order|_"
-   "``orders/items``", "|..Client.order_items|_", "|.~.OrderItemSearch|_", "|.~.OrderItem|_"
-   "``invoices``", "|..Client.invoices|_", "|.~.InvoiceSearch|_", "|.~.Invoice|_"
-   "``products``", "|..Client.products|_", "|.~.ProductSearch|_", "|.~.Product|_"
-   "``products/attributes``", "|..Client.product_attributes|_", "|.~.ProductAttributeSearch|_", "|.~.ProductAttribute|_"
-   "``categories``", "|..Client.categories|_", "|.~.CategorySearch|_", "|.~.Category|_"
-   "``customers``", "|..Client.customers|_", "|.~.CustomerSearch|_", "|.~.Customer|_"
-   "``endpoint``", "``Client.manager('endpoint')``", "|.~.SearchQuery|_", "|.~.APIResponse|_"
-
-
+   "``orders``", "|..Client.orders|_", "|.~.OrderManager|_", "|.~.Order|_"
+   "``orders/items``", "|..Client.order_items|_", "|.~.OrderItemManager|_", "|.~.OrderItem|_"
+   "``invoices``", "|..Client.invoices|_", "|.~.InvoiceManager|_", "|.~.Invoice|_"
+   "``products``", "|..Client.products|_", "|.~.ProductManager|_", "|.~.Product|_"
+   "``products/attributes``", "|..Client.product_attributes|_", "|.~.ProductAttributeManager|_", "|.~.ProductAttribute|_"
+   "``products/attributes/{attribute_code}/options``", "|..Client.product_attribute_options|_", "|.~.ProductAttributeOptionManager|_", "|.~.AttributeOption|_"
+   "``categories``", "|..Client.categories|_", "|.~.CategoryManager|_", "|.~.Category|_"
+   "``customers``", "|..Client.customers|_", "|.~.CustomerManager|_", "|.~.Customer|_"
+   "``shipments``", "|..Client.shipments|_", "|.~.ShipmentManager|_", "|.~.Shipment|_"
+   "``attribute_sets``", "|..Client.attribute_sets|_", "|.~.AttributeSetManager|_", "|.~.AttributeSet|_"
 
 ...
 
 ⚙ Installing MyMagento
-~~~~~~~~~~~~~~~~~~~~~~~~~~
-
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 To install using ``pip``::
 
-   pip install my-magento
+   pip install onesila-magneto
 
 Please note that ``MyMagento`` requires ``Python >= 3.10``
 
 ...
 
 📚 Documentation
-~~~~~~~~~~~~~~~~~~
+~~~~~~~~~~~~~~~~
 
 Full documentation can be found on `ReadTheDocs <https://my-magento.readthedocs.io/en/latest/>`_
 
 |
 
 QuickStart: Login with MyMagento
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 ``MyMagento`` uses the |.~.Client|_ class to handle all interactions with the API.
-
 
 .. raw:: html
 
@@ -341,7 +337,7 @@ QuickStart: Login with MyMagento
    </th>
    <tr><td>
 
-See `Get a Magento 2 REST API Token With MyMagento <https://my-magento.readthedocs.io/en/latest/examples/logging-in.html#logging-in>`_ for full details on generating an access token
+See `Get a Magento 2 REST API Token With MyMagento <https://my-magento.readthedocs.io/en/latest/examples/logging-in.html>`_ for full details on generating an access token
 
 .. raw:: html
 
@@ -349,21 +345,18 @@ See `Get a Magento 2 REST API Token With MyMagento <https://my-magento.readthedo
    </table>
 
 
-
 Setting the Login Credentials
-===================================
+=============================
 
 To generate an |.~.ACCESS_TOKEN|_ you'll need to |.~.authenticate|_ your |.~.USER_CREDENTIALS|_.
 
 Creating a |.~.Client|_ requires a ``domain``, ``username``, and ``password`` at minimum.
-
 
 .. code-block:: python
 
    >>> domain = 'website.com'
    >>> username ='username'
    >>> password = 'password'
-
 
 If you're using a local installation of Magento you'll need to set ``local=True``. Your domain should look like this:
 
@@ -375,10 +368,10 @@ If you're using a local installation of Magento you'll need to set ``local=True`
 ...
 
 Getting a |.~.Client|_
-=================================
+======================
 
 Option 1: Initialize a |.~.Client|_ Directly
-^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
 .. code-block:: python
 
@@ -388,10 +381,9 @@ Option 1: Initialize a |.~.Client|_ Directly
 
 
 Option 2: Call |.~.get_api|_
-^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
 .. code-block:: python
-
 
       import magento
 
@@ -402,7 +394,6 @@ Option 2: Call |.~.get_api|_
 * If the ``domain``, ``username``, or ``password`` are missing,
   it will attempt to use the following environment variables:
 
-
 .. code-block:: python
 
    import os
@@ -411,13 +402,13 @@ Option 2: Call |.~.get_api|_
    os.environ['MAGENTO_USERNAME']= username
    os.environ['MAGENTO_PASSWORD']= password
 
+
 ...
 
 Getting an |.~.ACCESS_TOKEN|_
-=======================================
+=============================
 
 Unless you specify ``login=False``, the |.~.Client|_ will automatically call |.~.authenticate|_ once initialized:
-
 
 .. code-block:: python
 
@@ -429,204 +420,124 @@ Unless you specify ``login=False``, the |.~.Client|_ will automatically call |.~
 
 |
 
+Managing Resources with Managers
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-Performing a |.~.search|_
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+The |.~.Manager|_ subclasses now handle all interactions with API endpoints, including searching, creating, and updating resources.
 
-.. |api_endpoints| replace:: API endpoint
-.. _api_endpoints: https://adobe-commerce.redoc.ly/2.3.7-admin/
-
-
-The |..Client.search|_ method lets you |.~.execute_search|_ a query on
-any |api_endpoints|_
-
-It creates a |.~.SearchQuery|_ for the endpoint,
-allowing you to retrieve data about
-
-* An individual item (ex. |.~.SearchQuery.by_id|_)
-* A list of items (ex. |.~.SearchQuery.by_list|_)
-* Any search criteria you desire (see `Building Custom Search Queries <https://my-magento.readthedocs.io/en/latest/interact-with-api.html#custom-queries>`_)
-
-
-
-
-...
-
-Example: |.~.search|_ an endpoint |.~.by_id|_
-=====================================================
+**Basic Example**: Searching for an order by ID
 
 .. code-block:: python
 
-    # Query the "invoices" endpoint (also: api.invoices)
-    >>> api.manager("invoices").by_id(1)
+    order = api.orders.by_id(12345)
+    print(order)
 
-    <Magento Invoice: "#000000001"> for <Magento Order: "#000000001" placed on 2022-11-01 03:27:33>
-
-
-
-Example: |.~.search|_ an endpoint |.~.by_list|_
-=======================================================
+**Creating a New Product**:
 
 .. code-block:: python
 
-    # Retrieve invoices from a list of invoice ids
-    >>> ids = list(range(1,101))
-    >>> api.invoices.by_list("entity_id", ids)
+    product_data = {
+        "sku": "new-sku",
+        "name": "New Product",
+        "attribute_set_id": 4,
+        "price": 199.99,
+    }
+    product = api.products.create(data=product_data)
+    print(product)
 
-    [<Magento Invoice: "#000000001"> for <Magento Order: "#000000001" placed on 2022-11-01 03:27:33>, ...]
-
-...
-
-Search Results: The |.~.Model|_ Classes
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-
-.. |the_models| replace:: the ``magento.models`` subpackage
-.. _the_models: models.html
-
-The |.~.SearchQuery.result|_ of any |.~.SearchQuery|_ will be parsed and wrapped by a
-|.~.Model|_ class in |the_models|_.
-
-These classes make the API response data easier to work with.
-
-They also provide endpoint-specific methods to update store data and search for related items.
-
-Example: Retrieving every |.~.Order|_ containing a |.~.Product|_
-==========================================================================
-
-Let's retrieve a |.~.Product|_ using |.~.ProductSearch.by_sku|_
+**Using `get_or_create`**:
 
 .. code-block:: python
 
-   >>> product = api.products.by_sku("24-MB01")
+    product, created = api.products.get_or_create(
+        data={
+            "sku": "existing-sku",
+            "name": "Existing Product",
+            "attribute_set_id": 4,
+            "price": 199.99,
+        },
+        unique_field="sku"
+    )
+    if created:
+        print("New product created:", product)
+    else:
+        print("Product already exists:", product)
 
-We can search for orders containing this product in multiple ways:
-
-.. code-block:: python
-
-    # Using the Product itself
-    >>> product.get_orders()
-
-    [<Magento Order: "#000000003" placed on 2022-12-21 08:09:33>, ... ]
-
-    # Using an OrderSearch
-    >>> api.orders.by_product(product)
-    >>> api.orders.by_product_id(product.id)
-    >>> api.orders.by_sku(product.sku)
-
-    [<Magento Order: "#000000003" placed on 2022-12-21 08:09:33>, ... ]
-
-
-
-Example: Retrieving all |.~.Product|_\s and |.~.Invoice|_\s for a |.~.Category|_
-===============================================================================================
+**Saving Changes to a Model**:
 
 .. code-block:: python
 
-    >>> category = api.categories.by_name("Watches")
-    >>> category.get_products()
-    >>> category.get_invoices()
+    attribute = api.product_attributes.by_code('test')
+    option = AttributeOption(data={}, attribute=attribute, client=api)
+    option.label = 'New Label'
+    option.sort_order = 3
+    option.save()
+    print(f"Attribute option saved with label: {option.label}")
 
-    [<Magento Product: 24-MG04>, <Magento Product: 24-MG01>, <Magento Product: 24-MG03>, ... ]
-    [<Magento Invoice: "#000000004"> for <Magento Order: "#000000004" placed on 2022-11-14 03:27:33>, ... ]
+Building Custom Queries with Managers
+=====================================
 
+While predefined methods cover most use cases, you can still build custom queries using Managers.
 
-
-Example: Updating the Thumbnail |.~.MediaEntry|_ of a |.~.Product|_
-=============================================================================
-
-.. code-block:: python
-
-    # Update product thumbnail label on specific store view
-   >>> product.thumbnail.set_alt_text("bonjour", scope="FR")
-   >>> print(product.thumbnail)
-
-    <MediaEntry 3417 for <Magento Product: 24-MB01>: bonjour>
-
-
-...
-
-
-
-.. raw:: html
-
-   <table>
-       <tr align="left">
-           <th>
-
-💡 Tip: Set the Store Scope
-
-.. raw:: html
-
-   </th>
-   <tr><td>
-
-If you have multiple store views, a ``store_code`` can be specified when
-retrieving/updating data
-
-* The |..Client.scope|_ is used by default - simply change it to switch store |.~.views|_
-* Passing the ``scope`` keyword argument to |..Client.url_for|_, |..Model.refresh|_,
-  and some Model update methods will temporarily override the Client scope
-
-.. raw:: html
-
-   </td></tr>
-   </table>
-
-
-...
-
-
-
-.. _Custom Queries:
-
-Building Custom Search Queries
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-
-In addition to the predefined methods, you can also build your own queries
-
-* Simply |.~.add_criteria|_, |.~.restrict_fields|_, and |.~.execute_search|_ the search
-* The |.~.since|_ and |.~.until|_ methods allow you to further filter your query by date
-
-
-
-
-.. raw:: html
-
-   <table>
-       <tr align="left">
-           <th>
-
-📋 Example: Retrieve Orders Over $50 Placed Since the Start of 2023
-
-.. raw:: html
-
-   </th>
-   <tr><td>
+**Example: Retrieve Orders Over $50 Placed Since 2023**:
 
 .. code-block:: python
 
- >>> api.orders.add_criteria(
- ...    field="grand_total",
- ...    value="50",
- ...    condition="gt"
- ... ).since("2023-01-01").execute_search()
+    orders = api.orders.add_criteria(
+        field="grand_total",
+        value="50",
+        condition="gt"
+    ).since("2023-01-01").execute_search()
 
- [<Magento Order: "#000000012" placed on 2023-01-02 05:19:55>, ...]
+    for order in orders:
+        print(order)
 
-.. raw:: html
+**Example: Get or Create an Attribute Option**:
 
-   </td></tr>
-   </table>
+.. code-block:: python
+
+    attribute = api.product_attributes.by_code('color')
+    option, created = api.product_attribute_options.get_or_create(
+        data={"label": "Red", "sort_order": 1},
+        unique_field="label"
+    )
+    if created:
+        print("New option created:", option)
+    else:
+        print("Option already exists:", option)
 
 
+Managing Immutable Models
+~~~~~~~~~~~~~~~~~~~~~~~~~
 
+The `ImmutableModel` subclass is designed for resources that cannot be modified after creation. Calling `save()` on an instance of this subclass will raise an `OperationNotAllowedError`.
 
+**Example**:
 
-...
+.. code-block:: python
 
+    immutable_instance = ImmutableModel(data={}, client=api)
+    try:
+        immutable_instance.save()
+    except OperationNotAllowedError as e:
+        print(f"Error: {e}")
+
+Managing Fetched-Only Models
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+The `FetchedOnlyModel` subclass can only be retrieved via API calls and cannot be created directly. Attempting to initialize this model for creation will raise an `OperationNotAllowedError`.
+
+**Example**:
+
+.. code-block:: python
+
+    try:
+        fetched_instance = FetchedOnlyModel(data={}, client=api, endpoint='endpoint', fetched=False)
+    except OperationNotAllowedError as e:
+        print(f"Error: {e}")
 
 Making Authorized Requests
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 The |.~.Client|_ can be used to generate the |.~.url_for|_ any API endpoint,
 including a store |.~.scope|_.
@@ -634,9 +545,8 @@ including a store |.~.scope|_.
 You can use this URL to make an authorized
 |.~.get|_, |.~.post|_, |.~.put|_, or |.~.delete|_ request.
 
-
 Example: Making a |.~.get|_ Request
-=============================================
+===================================
 
 .. code-block:: python
 
@@ -646,8 +556,6 @@ Example: Making a |.~.get|_ Request
  >>> print(response.json())
 
  {'adjustment': 1.5, 'adjustment_negative': 0, 'adjustment_positive': 1.5, 'base_adjustment': 1.5,  ... }
-
-
 
 .. raw:: html
 
@@ -679,6 +587,4 @@ be wrapped by  |.~.APIResponse|_ or other |.~.Model|_
 
    </td></tr>
    </table>
-
-
 

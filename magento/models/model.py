@@ -516,7 +516,21 @@ class FetchedOnlyModel(Model):
 
         super().__init__(data, client, endpoint, fetched=fetched, list_endpoint=list_endpoint)
 
-    @classmethod
-    def create(cls, *args, **kwargs):
-        """Custom create method to handle specific creation logic."""
-        raise NotImplementedError(f"{cls.__name__} must be created using a custom method.")
+
+class ImmutableModel(Model):
+    """
+    A subclass of Model that represents an immutable resource.
+    This model does not allow modifications or saving after initialization.
+    """
+
+    @property
+    def mutable_keys(self) -> List[str]:
+        """This model has no mutable keys."""
+        return []
+
+    def save(self, add_save_options: bool = False, scope: Optional[str] = None, refresh: bool = True) -> bool:
+        """
+        Override the save method to prevent any modifications from being saved.
+        Attempting to call save on an ImmutableModel will raise an error.
+        """
+        raise OperationNotAllowedError(self.client, 'SAVE', self.__class__.__name__)

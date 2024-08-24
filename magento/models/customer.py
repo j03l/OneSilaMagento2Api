@@ -1,5 +1,5 @@
 from __future__ import annotations
-from . import Model, Order
+from . import ImmutableModel, Order
 from typing import TYPE_CHECKING, Optional, List, Dict
 from functools import cached_property
 
@@ -7,7 +7,7 @@ if TYPE_CHECKING:
     from magento import Client
 
 
-class Customer(Model):
+class Customer(ImmutableModel):
 
     """Wrapper for the ``customers`` endpoint"""
 

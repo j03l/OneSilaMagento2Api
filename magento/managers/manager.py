@@ -6,7 +6,7 @@ from typing import Union, Type, Iterable, List, Optional, Dict, TYPE_CHECKING
 import requests
 
 from ..models import Model, APIResponse
-from ..exceptions import MagentoError, InstanceCreateFailed
+from ..exceptions import MagentoError, InstanceCreateFailed, InstanceGetFailed
 from .. import clients
 from ..utils import get_payload_prefix
 
@@ -263,7 +263,15 @@ class Manager:
         :param item_id: id of the item to retrieve
         """
         self.query = self.query.strip('?') + str(item_id)
-        return self.execute_search(apply_pagination=False)
+        instance =  self.execute_search(apply_pagination=False)
+
+        if self.client.strict_mode and instance is None:
+            error_message = f"{self.Model} with uid {item_id} does not exists!"
+            self.client.logger.error(error_message)
+
+            raise InstanceGetFailed(error_message)
+
+        return instance
 
     def by_list(self, field: str, values: Iterable) -> Optional[Model, List[Model]]:
         """Manager for multiple items using an iterable or comma-separated string of field values
@@ -488,7 +496,8 @@ class Manager:
 
         # Ensure the mutable data is populated with initial values
         for k, v in instance.mutable_initial_values.items():
-            setattr(instance, k, v)
+            if not hasattr(instance, k):
+                setattr(instance, k, v)
 
         # Now, instance.mutable_data contains the full payload for creation
         mutable_data = instance.mutable_data

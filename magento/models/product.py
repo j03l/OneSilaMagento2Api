@@ -845,7 +845,7 @@ class Product(Model):
 class MediaEntry(Model):
     """Wraps a media gallery entry of a :class:`Product`"""
 
-    MEDIA_TYPES = ['base', 'small', 'thumbnail', 'swatch']
+    MEDIA_TYPES = ['base', 'small', 'thumbnail', 'swatch', 'small_image', 'image']
 
     DOCUMENTATION = "https://adobe-commerce.redoc.ly/2.3.7-admin/tag/productsskumediaentryId"
     IDENTIFIER = "id"
