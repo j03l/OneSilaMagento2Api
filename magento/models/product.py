@@ -67,6 +67,7 @@ class Product(Model):
             'type_id',
             'status',
             'backorders',
+            'views',
             'short_description',
             'category_ids',
             'meta_title',
@@ -277,6 +278,14 @@ class Product(Model):
         except AttributeError:
             return None
 
+    @property
+    @data_not_fetched_value(lambda self: [])
+    def views(self) -> Optional[list]:
+        """
+        Retrieves the website_ids from extension_attributes if available.
+        """
+        return self.extension_attributes.get('website_ids', [])
+
     # ------------------------------------------------- PROPERTIES SETTERS (the ones that can be updateD)
 
     @name.setter
@@ -317,6 +326,7 @@ class Product(Model):
 
         self.mutable_data['status'] = value
         self._status = value
+
     @stock.setter
     @set_private_attr_after_setter
     def stock(self, value: Optional[int]) -> None:
@@ -460,6 +470,18 @@ class Product(Model):
                 self.mutable_data['custom_attributes'].append({'attribute_code': 'url_key', 'value': value})
 
             self._update_internal_custom_attribute('url_key', value)
+
+    @views.setter
+    @set_private_attr_after_setter
+    def views(self, value: Optional[list]) -> None:
+        """
+        Sets the website_ids within extension_attributes to the provided list of IDs.
+        """
+        if value is not None:
+            self.mutable_data.setdefault('extension_attributes', {})
+            self.mutable_data['extension_attributes']['website_ids'] = value
+
+            self.extension_attributes['website_ids'] = value
 
     # ------------------------------------------------- CUSTOM METHODS
 

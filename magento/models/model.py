@@ -1,4 +1,6 @@
 from __future__ import annotations
+
+import json
 from functools import cached_property
 from abc import ABC, abstractmethod
 from typing import TYPE_CHECKING, Union, Optional, List, Dict
@@ -456,6 +458,25 @@ class Model(ABC):
         """Method that allow override to the create payload"""
         return payload
 
+    def to_dict(self) -> dict:
+        """
+        Converts the model instance to a dictionary.
+        """
+        result = {}
+        for key, value in self.__dict__.items():
+            # Exclude any private attributes or methods
+            if not key.startswith('_'):
+                result[key] = value
+            # If the value is another Model instance, recursively convert it to a dict
+            elif isinstance(value, Model):
+                result[key] = value.to_dict()
+        return result
+
+    def to_json(self) -> str:
+        """
+        Converts the model instance to a JSON string.
+        """
+        return json.dumps(self.to_dict(), default=str)
 
 class APIResponse(Model):
 

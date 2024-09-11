@@ -5,7 +5,7 @@ from . import utils
 from . import exceptions
 import os
 
-__version__ = "1.0.1"
+__version__ = "1.0.2"
 
 from .constants import AuthenticationMethod
 
@@ -36,7 +36,7 @@ def get_api(**kwargs) -> Client:
         'username': kwargs.get('username', os.getenv('MAGENTO_USERNAME')),
         'password': kwargs.get('password', os.getenv('MAGENTO_PASSWORD')),
         'api_key': kwargs.get('api_key', os.getenv('MAGENTO_API_KEY')),
-        'authentication_method': kwargs.get('authentication_method', AuthenticationMethod.PASSWORD),
+        'authentication_method': kwargs.get('authentication_method', AuthenticationMethod.PASSWORD.value),
         'local': kwargs.get('local', False),
     }
 
@@ -45,11 +45,11 @@ def get_api(**kwargs) -> Client:
         raise ValueError("Missing login credentials: 'domain' is required.")
 
     # Check the combination of credentials based on the authentication method
-    if credentials['authentication_method'] == AuthenticationMethod.PASSWORD:
+    if credentials['authentication_method'] == AuthenticationMethod.PASSWORD.value:
         if credentials['username'] is None or credentials['password'] is None:
             raise ValueError("Missing login credentials: 'username' and 'password' are required for PASSWORD authentication.")
 
-    elif credentials['authentication_method'] == AuthenticationMethod.TOKEN:
+    elif credentials['authentication_method'] == AuthenticationMethod.TOKEN.value:
         if credentials['api_key'] is None:
             raise ValueError("Missing login credentials: 'api_key' is required for TOKEN authentication.")
 

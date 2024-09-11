@@ -36,7 +36,7 @@ class Client:
             log_level: str = 'INFO',
             login: bool = True,
             strict_mode: bool = True,
-            authentication_method: AuthenticationMethod = AuthenticationMethod.PASSWORD,
+            authentication_method: AuthenticationMethod = AuthenticationMethod.PASSWORD.value,
             **kwargs
     ):
         """Initialize a Client
@@ -351,7 +351,7 @@ class Client:
         if self.USER_CREDENTIALS['password'] is None and self.api_key is None:
             raise ValueError('Ether password or api key must be provided.')
 
-        if self.authentication_method == AuthenticationMethod.TOKEN:
+        if self.authentication_method == AuthenticationMethod.TOKEN.value:
             self.ACCESS_TOKEN = self.api_key
         else:
             endpoint = self.url_for('integration/admin/token')
