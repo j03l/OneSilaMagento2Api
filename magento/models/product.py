@@ -25,6 +25,9 @@ class Product(Model):
     VISIBILITY_SEARCH = 3
     VISIBILITY_BOTH = 4
 
+    PRODUCT_TYPE_SIMPLE = "simple"
+    PRODUCT_TYPE_CONFIGURABLE = "configurable"
+
     DOCUMENTATION = 'https://adobe-commerce.redoc.ly/2.3.7-admin/tag/products/'
     IDENTIFIER = 'sku'
     ALLOWED_METHODS = [ModelMethod.GET, ModelMethod.CREATE, ModelMethod.UPDATE, ModelMethod.DELETE]
@@ -66,6 +69,7 @@ class Product(Model):
             'visibility',
             'type_id',
             'status',
+            'stock',
             'backorders',
             'views',
             'short_description',

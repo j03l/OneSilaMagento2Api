@@ -136,6 +136,15 @@ class ProductManager(Manager):
 
         return  None
 
+    def create(self, data: dict, scope: Optional[str] = None, extra_data: Optional[dict] = None) -> Optional[Model]:
+        # Modify extra_data before calling super().create
+        if extra_data and 'custom_attributes' in extra_data:
+            attribute_data = extra_data['custom_attributes']
+            # Pack the attributes using self.model
+            extra_data['custom_attributes'] = self.Model.pack_attributes(attribute_data)
+
+        # Call the original create method with the modified extra_data
+        return super().create(data=data, scope=scope, extra_data=extra_data)
 
 class MediaEntryManager(MinimalManager):
     """

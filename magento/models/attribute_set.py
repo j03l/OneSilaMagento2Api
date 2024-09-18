@@ -15,6 +15,7 @@ class AttributeSet(Model):
     IDENTIFIER = 'attribute_set_id'
     ALLOWED_METHODS = [ModelMethod.GET, ModelMethod.CREATE, ModelMethod.UPDATE, ModelMethod.DELETE]
     ENTITY_TYPE_ID = 4
+
     def __init__(self, data: dict, client: Client, fetched: bool = False):
         """Initialize an AttributeSet object using an API response from the ``attribute-sets`` endpoint
 
@@ -38,6 +39,7 @@ class AttributeSet(Model):
     def required_for_update_keys(self) -> List[str]:
         """Keys required for update operations."""
         return ['attribute_set_id', 'attribute_set_name', 'entity_type_id']
+
     @property
     def attribute_set_name(self) -> Optional[str]:
         return self._attribute_set_name
@@ -71,6 +73,7 @@ class AttributeSet(Model):
     @set_private_attr_after_setter
     def entity_type_id(self, value: Optional[int]) -> None:
         self.mutable_data['entity_type_id'] = value
+
     @skeleton_id.setter
     @set_private_attr_after_setter
     def skeleton_id(self, value: Optional[int]) -> None:

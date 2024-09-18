@@ -484,7 +484,7 @@ class Manager:
                 self.client.logger.error(f"Failed to parse JSON response: {response.content}. Initial error: {str(e)}")
                 return None
 
-    def create(self, data: dict, scope: Optional[str] = None) -> Optional[Model]:
+    def create(self, data: dict, scope: Optional[str] = None, extra_data: Optional[dict] = None) -> Optional[Model]:
         """
         Create a new instance with the provided model instance.
 
@@ -512,6 +512,17 @@ class Manager:
                 mutable_data[key] = val
 
         payload_prefix = get_payload_prefix(endpoint=self.create_endpoint, payload_prefix=instance.PAYLOAD_PREFIX)
+
+        if extra_data:
+            # Handle custom_attributes merging if both mutable_data and extra_data contain it
+            if 'custom_attributes' in extra_data and 'custom_attributes' in mutable_data:
+                # Merge custom attributes, leaving existing ones intact
+                mutable_data['custom_attributes'].update(extra_data['custom_attributes'])
+                # Remove custom_attributes from extra_data to prevent overwriting
+                extra_data.pop('custom_attributes')
+
+            # Now update mutable_data with any remaining keys in extra_data
+            mutable_data.update(extra_data)
 
         # Construct the final payload with the prefix
         payload = {payload_prefix: mutable_data}
