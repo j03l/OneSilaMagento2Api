@@ -485,6 +485,9 @@ class Product(Model):
             self.mutable_data.setdefault('extension_attributes', {})
             self.mutable_data['extension_attributes']['website_ids'] = value
 
+            if not hasattr(self, 'extension_attributes'):
+                self.extension_attributes = {}
+
             self.extension_attributes['website_ids'] = value
 
     # ------------------------------------------------- CUSTOM METHODS
