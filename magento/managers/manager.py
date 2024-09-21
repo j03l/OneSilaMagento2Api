@@ -516,13 +516,22 @@ class Manager:
         if extra_data:
             # Handle custom_attributes merging if both mutable_data and extra_data contain it
             if 'custom_attributes' in extra_data and 'custom_attributes' in mutable_data:
-                # Merge custom attributes, leaving existing ones intact
-                mutable_data['custom_attributes'].update(extra_data['custom_attributes'])
+                # Check if mutable_data['custom_attributes'] is a dictionary or a list
+                if isinstance(mutable_data['custom_attributes'], dict):
+                    # Update the dictionary with new custom attributes
+                    mutable_data['custom_attributes'].update(extra_data['custom_attributes'])
+                elif isinstance(mutable_data['custom_attributes'], list):
+                    # Check if extra_data['custom_attributes'] is also a list
+                    if isinstance(extra_data['custom_attributes'], list):
+                        # Append each element of the extra list to the mutable list
+                        mutable_data['custom_attributes'].extend(extra_data['custom_attributes'])
+                    elif isinstance(extra_data['custom_attributes'], dict):
+                        # If extra_data is a dict, convert it to the correct format and append
+                        for key, value in extra_data['custom_attributes'].items():
+                            mutable_data['custom_attributes'].append({'attribute_code': key, 'value': value})
+
                 # Remove custom_attributes from extra_data to prevent overwriting
                 extra_data.pop('custom_attributes')
-
-            # Now update mutable_data with any remaining keys in extra_data
-            mutable_data.update(extra_data)
 
         # Construct the final payload with the prefix
         payload = {payload_prefix: mutable_data}
