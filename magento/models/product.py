@@ -380,16 +380,15 @@ class Product(Model):
     @special_price.setter
     @set_private_attr_after_setter
     def special_price(self, value: Optional[str]) -> None:
-        if value:
-            self.mutable_data.setdefault('custom_attributes', [])
-            for attr in self.mutable_data['custom_attributes']:
-                if attr['attribute_code'] == 'special_price':
-                    attr['value'] = value
-                    break
-            else:
-                self.mutable_data['custom_attributes'].append({'attribute_code': 'special_price', 'value': value})
+        self.mutable_data.setdefault('custom_attributes', [])
+        for attr in self.mutable_data['custom_attributes']:
+            if attr['attribute_code'] == 'special_price':
+                attr['value'] = value
+                break
+        else:
+            self.mutable_data['custom_attributes'].append({'attribute_code': 'special_price', 'value': value})
 
-            self._update_internal_custom_attribute('special_price', value)
+        self._update_internal_custom_attribute('special_price', value)
 
     @short_description.setter
     @set_private_attr_after_setter
