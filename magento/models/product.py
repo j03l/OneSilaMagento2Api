@@ -334,18 +334,22 @@ class Product(Model):
     @stock.setter
     @set_private_attr_after_setter
     def stock(self, value: Optional[int]) -> None:
-        if value is not None:
-            self.mutable_data.setdefault('extension_attributes', {})
-            stock_item = self.mutable_data['extension_attributes'].setdefault('stock_item', {})
+        # Initialize extension_attributes if not present
+        self.mutable_data.setdefault('extension_attributes', {})
+        stock_item = self.mutable_data['extension_attributes'].setdefault('stock_item', {})
 
-            # Update the relevant part of stock_item
-            stock_item.update({
-                "qty": value,
-                "is_in_stock": value > 0
-            })
+        stock_item["qty"] = value
 
-            if self.stock_item:
-                self.stock_item['qty'] = value
+        if self.type_id == self.PRODUCT_TYPE_CONFIGURABLE:
+            stock_item["is_in_stock"] = True
+        else:
+            stock_item["is_in_stock"] = value is not None and value > 0
+
+        if self.stock_item:
+            self.stock_item['qty'] = value
+
+        if self.stock_item:
+            self.stock_item['is_in_stock'] = stock_item["is_in_stock"]
 
     @backorders.setter
     @set_private_attr_after_setter
@@ -365,17 +369,16 @@ class Product(Model):
 
     @description.setter
     @set_private_attr_after_setter
-    def description(self, value: Optional[str]) -> None:
-        if value:
-            self.mutable_data.setdefault('custom_attributes', [])
-            for attr in self.mutable_data['custom_attributes']:
-                if attr['attribute_code'] == 'description':
-                    attr['value'] = value
-                    break
-            else:
-                self.mutable_data['custom_attributes'].append({'attribute_code': 'description', 'value': value})
+    def description(self, value: Optional[str | None]) -> None:
+        self.mutable_data.setdefault('custom_attributes', [])
+        for attr in self.mutable_data['custom_attributes']:
+            if attr['attribute_code'] == 'description':
+                attr['value'] = value
+                break
+        else:
+            self.mutable_data['custom_attributes'].append({'attribute_code': 'description', 'value': value})
 
-            self._update_internal_custom_attribute('description', value)
+        self._update_internal_custom_attribute('description', value)
 
     @special_price.setter
     @set_private_attr_after_setter
@@ -392,17 +395,16 @@ class Product(Model):
 
     @short_description.setter
     @set_private_attr_after_setter
-    def short_description(self, value: Optional[str]) -> None:
-        if value:
-            self.mutable_data.setdefault('custom_attributes', [])
-            for attr in self.mutable_data['custom_attributes']:
-                if attr['attribute_code'] == 'short_description':
-                    attr['value'] = value
-                    break
-            else:
-                self.mutable_data['custom_attributes'].append({'attribute_code': 'short_description', 'value': value})
+    def short_description(self, value: Optional[str | None]) -> None:
+        self.mutable_data.setdefault('custom_attributes', [])
+        for attr in self.mutable_data['custom_attributes']:
+            if attr['attribute_code'] == 'short_description':
+                attr['value'] = value
+                break
+        else:
+            self.mutable_data['custom_attributes'].append({'attribute_code': 'short_description', 'value': value})
 
-            self._update_internal_custom_attribute('short_description', value)
+        self._update_internal_custom_attribute('short_description', value)
 
     @category_ids.setter
     @set_private_attr_after_setter
@@ -420,45 +422,42 @@ class Product(Model):
 
     @meta_title.setter
     @set_private_attr_after_setter
-    def meta_title(self, value: Optional[str]) -> None:
-        if value:
-            self.mutable_data.setdefault('custom_attributes', [])
-            for attr in self.mutable_data['custom_attributes']:
-                if attr['attribute_code'] == 'meta_title':
-                    attr['value'] = value
-                    break
-            else:
-                self.mutable_data['custom_attributes'].append({'attribute_code': 'meta_title', 'value': value})
+    def meta_title(self, value: Optional[str | None]) -> None:
+        self.mutable_data.setdefault('custom_attributes', [])
+        for attr in self.mutable_data['custom_attributes']:
+            if attr['attribute_code'] == 'meta_title':
+                attr['value'] = value
+                break
+        else:
+            self.mutable_data['custom_attributes'].append({'attribute_code': 'meta_title', 'value': value})
 
-            self._update_internal_custom_attribute('meta_title', value)
+        self._update_internal_custom_attribute('meta_title', value)
 
     @meta_keyword.setter
     @set_private_attr_after_setter
-    def meta_keyword(self, value: Optional[str]) -> None:
-        if value:
-            self.mutable_data.setdefault('custom_attributes', [])
-            for attr in self.mutable_data['custom_attributes']:
-                if attr['attribute_code'] == 'meta_keyword':
-                    attr['value'] = value
-                    break
-            else:
-                self.mutable_data['custom_attributes'].append({'attribute_code': 'meta_keyword', 'value': value})
+    def meta_keyword(self, value: Optional[str | None]) -> None:
+        self.mutable_data.setdefault('custom_attributes', [])
+        for attr in self.mutable_data['custom_attributes']:
+            if attr['attribute_code'] == 'meta_keyword':
+                attr['value'] = value
+                break
+        else:
+            self.mutable_data['custom_attributes'].append({'attribute_code': 'meta_keyword', 'value': value})
 
-            self._update_internal_custom_attribute('meta_keyword', value)
+        self._update_internal_custom_attribute('meta_keyword', value)
 
     @meta_description.setter
     @set_private_attr_after_setter
-    def meta_description(self, value: Optional[str]) -> None:
-        if value:
-            self.mutable_data.setdefault('custom_attributes', [])
-            for attr in self.mutable_data['custom_attributes']:
-                if attr['attribute_code'] == 'meta_description':
-                    attr['value'] = value
-                    break
-            else:
-                self.mutable_data['custom_attributes'].append({'attribute_code': 'meta_description', 'value': value})
+    def meta_description(self, value: Optional[str | None]) -> None:
+        self.mutable_data.setdefault('custom_attributes', [])
+        for attr in self.mutable_data['custom_attributes']:
+            if attr['attribute_code'] == 'meta_description':
+                attr['value'] = value
+                break
+        else:
+            self.mutable_data['custom_attributes'].append({'attribute_code': 'meta_description', 'value': value})
 
-            self._update_internal_custom_attribute('meta_description', value)
+        self._update_internal_custom_attribute('meta_description', value)
 
     @url_key.setter
     @set_private_attr_after_setter
