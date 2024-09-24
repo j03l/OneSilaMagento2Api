@@ -3,7 +3,7 @@ from . import Model, Product, APIResponse, ProductAttribute
 from typing import TYPE_CHECKING, Optional, List
 from ..constants import ModelMethod
 from ..decorators import set_private_attr_after_setter
-from ..exceptions import LockedAttributeError, GeneralApiError
+from ..exceptions import LockedAttributeError, GeneralApiError, GroupNotFoundError
 
 if TYPE_CHECKING:
     from magento import Client
@@ -86,6 +86,15 @@ class AttributeSet(Model):
         return self.client.products.by_attribute_set(self)
 
     # ------------------------------------------------- CUSTOM METHODS
+    def get_or_create_group_by_name(self, attribute_group_name: str) -> Model:
+        if not self._fetched:
+            raise ValueError('The attribute set is not created.')
+
+        try:
+            return self.get_group_by_name(attribute_group_name)
+        except GroupNotFoundError:
+            return self.create_group(attribute_group_name)
+
     def create_group(self, attribute_group_name: str) -> Model:
         """Create a new attribute group within this attribute set."""
         if not self._fetched:
@@ -100,6 +109,10 @@ class AttributeSet(Model):
 
         endpoint = f'{self.endpoint}/groups'
         response = self.client.post(self.client.url_for(endpoint), payload)
+
+        if not response.ok:
+            raise ValueError(f"Failed to create attribute group '{attribute_group_name}': {response.text}")
+
         return Model(data=response.json(), client=self.client, endpoint=endpoint, fetched=True)
 
     def update_group_name(self, attribute_group_id: int, new_name: str) -> Model:
@@ -127,16 +140,17 @@ class AttributeSet(Model):
         response = self.client.delete(self.client.url_for(f'{self.endpoint}/groups/{attribute_group_id}'))
         return response.ok
 
-    def get_group_id(self, attribute_group_name: str) -> int:
-        """Get the ID of a group within this attribute set by name."""
+    def get_group_by_name(self, attribute_group_name: str) -> Model:
+        """Get a group within this attribute set by name."""
         if not self._fetched:
             raise ValueError('The attribute set is not created.')
 
         groups = self.get_groups()
         for group in groups:
             if group.attribute_group_name == attribute_group_name:
-                return group.attribute_group_id
-        raise AttributeError(f"Attribute group '{attribute_group_name}' does not exist.")
+                return group
+
+        raise GroupNotFoundError(attribute_group_name)
 
     def get_groups(self)-> Optional[APIResponse | List[APIResponse]]:
         if not self._fetched:

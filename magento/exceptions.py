@@ -127,3 +127,11 @@ class LockedAttributeError(Exception):
 class GeneralApiError(Exception):
     """Raised for general API errors."""
     pass
+
+
+class GroupNotFoundError(Exception):
+    """Custom exception raised when a group is not found."""
+
+    def __init__(self, group_name: str):
+        super().__init__(f"Attribute group '{group_name}' does not exist.")
+        self.group_name = group_name
