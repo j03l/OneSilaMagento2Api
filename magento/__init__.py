@@ -5,7 +5,7 @@ from . import utils
 from . import exceptions
 import os
 
-__version__ = "1.0.10"
+__version__ = "1.0.11"
 
 from .constants import AuthenticationMethod
 
