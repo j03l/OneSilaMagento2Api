@@ -340,10 +340,11 @@ class Product(Model):
 
         stock_item["qty"] = value
 
-        if self.type_id == self.PRODUCT_TYPE_CONFIGURABLE:
-            stock_item["is_in_stock"] = True
-        else:
-            stock_item["is_in_stock"] = value is not None and value > 0
+        if hasattr(self, 'self'):
+            if self.type_id == self.PRODUCT_TYPE_CONFIGURABLE:
+                stock_item["is_in_stock"] = True
+            else:
+                stock_item["is_in_stock"] = value is not None and value > 0
 
         if self.stock_item:
             self.stock_item['qty'] = value
