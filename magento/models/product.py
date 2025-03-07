@@ -901,7 +901,11 @@ class MediaEntry(Model):
         if not self._fetched and 'image_url' in self.data:
             self.mutable_data['image_url'] = self.data['image_url']
 
-        return super().save(add_save_options=add_save_options, scope=scope, refresh=refresh)
+        if self.client.store.is_single_store:
+            return super().save(add_save_options=add_save_options, refresh=refresh, multiple_scopes=[None, 'all'])
+
+        update_scopes = [config.code for config in self.configs] + ['all']
+        return super().save(add_save_options=add_save_options, refresh=refresh, update_scopes=update_scopes)
 
     def query_endpoint(self) -> None:
         """No search endpoint exists for media gallery entries"""

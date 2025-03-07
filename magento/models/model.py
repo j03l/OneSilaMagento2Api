@@ -263,7 +263,7 @@ class Model(ABC):
         self.mutable_data = {}
 
     @validate_method_for_model(ModelMethod.UPDATE)
-    def save(self, add_save_options: bool = False, scope: Optional[str] = None, refresh: bool = True) -> bool:
+    def save(self, add_save_options: bool = False, scope: Optional[str] = None, refresh: bool = True, multiple_scopes: Optional[List[str]] = None) -> bool:
         """Save the instance with the provided attribute data.
 
         This method compares the mutable initial values with the mutable data keys,
@@ -273,6 +273,7 @@ class Model(ABC):
         :param add_save_options: Whether to add the 'save_options' flag to the payload.
         :param scope: The scope to send the request on; will use the default scope if not provided.
         :param refresh: Decode of we perform refresh after create
+        :param multiple_scopes: An optional list of scopes to update. If provided, the update is sent for each scope.
         :returns: Boolean indicating the success of the save operation.
         """
 
@@ -335,26 +336,34 @@ class Model(ABC):
 
         payload = self.enchance_payload(payload)
 
-        # Send the PUT request
-        url = self.data_endpoint(scope)
-        response = self.client.put(url, payload)
+        def send_put_request(s):
+            url = self.data_endpoint(s)
+            response = self.client.put(url, payload)
+            if response.ok:
+                if refresh:
+                    self.refresh(s)
+                    self.clear_mutable_data()
+                self.logger.info(f'{self.__class__.__name__} with data: {data} was successfully updated on scope {s}.')
+                return True
+            else:
+                error_message = (
+                    f'Failed to update {self.__class__.__name__} with status code {response.status_code} on scope {s}.\n'
+                    f'Message: {MagentoError.parse(response)}'
+                )
+                self.logger.error(error_message)
+                if self.client.strict_mode:
+                    raise InstanceUpdateFailed(error_message)
+                return False
 
-        if response.ok:
-            if refresh:
-                self.refresh(scope)
-                self.clear_mutable_data()
-            self.logger.info(f'{self.__class__.__name__} with data: {data} was successfully updated.')
-            return True
+        if multiple_scopes is not None:
+            overall_success = True
+            for s in multiple_scopes:
+                result = send_put_request(s)
+                overall_success = overall_success and result
+            return overall_success
         else:
-            error_message = (
-                f'Failed to update {self.__class__.__name__} with status code {response.status_code}.\n'
-                f'Message: {MagentoError.parse(response)}'
-            )
+            return send_put_request(scope)
 
-            self.logger.error(error_message)
-            if self.client.strict_mode:
-                raise InstanceUpdateFailed(error_message)
-            return False
 
     @validate_method_for_model(ModelMethod.DELETE)
     def delete(self) -> bool:

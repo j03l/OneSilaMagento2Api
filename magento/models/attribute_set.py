@@ -181,6 +181,30 @@ class AttributeSet(Model):
         response = self.client.post(self.client.url_for(endpoint), payload)
         return response.ok
 
+    def update_attribute_sort_orders(self, attribute_group_id: int, sort_order_dict: dict) -> bool:
+        """
+        Update sort orders for existing attributes in this attribute set.
+        :param attribute_group_id: The attribute group ID.
+        :param sort_order_dict: Dictionary with attribute_code as key and new sort order as value.
+        :return: True if all updates succeed, False otherwise.
+        """
+        success = True
+        for attribute_code, sort_order in sort_order_dict.items():
+            endpoint = f'{self.endpoint}/{self.attribute_set_id}/attributes/{attribute_code}'
+            payload = {
+                'attributeGroupId': attribute_group_id,
+                'attributeCode': attribute_code,
+                'sortOrder': sort_order,
+            }
+            response = self.client.put(self.client.url_for(endpoint), payload)
+            if not response.ok:
+                self.logger.error(
+                    f"Failed to update sort order for attribute {attribute_code} with status code {response.status_code}."
+                )
+                success = False
+
+        return success
+
     def remove_attribute_set_attribute(self, attribute_code: str) -> bool:
         """Remove an attribute from this attribute set."""
         if not self._fetched:
