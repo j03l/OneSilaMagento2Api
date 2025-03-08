@@ -318,7 +318,8 @@ class Model(ABC):
 
         # Ensure all required keys are present in the data
         for key in self.required_keys:
-            data[key] = self.data.get(key)
+            if key not in data:
+                data[key] = self.data.get(key)
 
         # we add to the payload required attributes that can't be updated but are required for the update to work
         for key in self.required_for_update_keys:
