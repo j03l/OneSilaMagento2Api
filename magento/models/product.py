@@ -1139,6 +1139,7 @@ class ProductAttribute(Model):
     TEXT = "text"
     TEXTAREA = "textarea"
     DATE = "date"
+    DATETIME = "datetime"
     BOOLEAN = "boolean"
     SELECT = "select"
     MULTISELECT = "multiselect"
