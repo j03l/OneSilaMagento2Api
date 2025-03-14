@@ -384,8 +384,12 @@ class Product(Model):
             stock_item = self.mutable_data['extension_attributes'].setdefault('stock_item', {})
 
             stock_item.update({
-                "manage_stock": value
+                "manage_stock": value,
+                "use_config_manage_stock": value,
             })
+
+            if self.stock_item:
+                self.stock_item['manage_stock'] = value
 
     @description.setter
     @set_private_attr_after_setter
