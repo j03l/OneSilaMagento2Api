@@ -71,6 +71,7 @@ class Product(Model):
             'status',
             'stock',
             'backorders',
+            'manage_stock',
             'views',
             'short_description',
             'category_ids',
@@ -217,6 +218,14 @@ class Product(Model):
     def backorders(self) -> Optional[bool]:
         if self.stock_item:
             return self.stock_item.get('backorders') == 1
+
+    @property
+    @data_not_fetched_value(lambda self: self._manage_stock)
+    def manage_stock(self) -> Optional[bool]:
+        """Whether stock management is enabled for the product."""
+        if self.stock_item:
+            return self.stock_item.get('manage_stock')
+
 
     @property
     @data_not_fetched_value(lambda self: self._stock)
@@ -366,6 +375,17 @@ class Product(Model):
 
             if self.stock_item:
                 self.stock_item['backorders'] = 1 if value else 0
+
+    @manage_stock.setter
+    @set_private_attr_after_setter
+    def manage_stock(self, value: Optional[bool]) -> None:
+        if value is not None:
+            self.mutable_data.setdefault('extension_attributes', {})
+            stock_item = self.mutable_data['extension_attributes'].setdefault('stock_item', {})
+
+            stock_item.update({
+                "manage_stock": value
+            })
 
     @description.setter
     @set_private_attr_after_setter
