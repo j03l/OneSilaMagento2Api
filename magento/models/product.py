@@ -388,6 +388,10 @@ class Product(Model):
                 "use_config_manage_stock": value,
             })
 
+            if hasattr(self, 'self'):
+                if self.type_id == self.PRODUCT_TYPE_CONFIGURABLE:
+                    stock_item["is_in_stock"] = True
+
             if self.stock_item:
                 self.stock_item['manage_stock'] = value
 
