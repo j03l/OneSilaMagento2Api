@@ -146,6 +146,13 @@ class ProductManager(Manager):
         # Call the original create method with the modified extra_data
         return super().create(data=data, scope=scope, extra_data=extra_data)
 
+    def count(self) -> int:
+        """Return the total number of ProductAttributes"""
+        # Build query manually
+        query = f"{self.query}searchCriteria[pageSize]=1&fields=total_count"
+        response = self.client.get(query)
+        return response.json().get('total_count', 0)
+
 class MediaEntryManager(MinimalManager):
     """
     :class:`MinimalManager` subclass for managing media entries in the ``products/{product_sku}/media`` endpoint.
@@ -230,6 +237,7 @@ class ProductAttributeManager(Manager):
 
     def all_in_memory(self) -> Optional[List[ProductAttribute]]:
         """Retrieve a list of all :class:`~.ProductAttribute`s"""
+        self.add_criteria('position', 0, 'gteq')
         return super().all_in_memory()
 
     def by_code(self, attribute_code: str) -> Optional[ProductAttribute]:
