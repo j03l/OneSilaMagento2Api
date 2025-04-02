@@ -99,8 +99,10 @@ class Client:
         self.logger: MagentoLogger = self.get_logger(
             stdout_level=log_level,
             log_file=kwargs.get('log_file', None),
+            log_dir=kwargs.get('log_dir', None),
             log_requests=kwargs.get('log_requests', True)
         )
+
         #: An initialized :class:`Store` object
         self.store: Store = Store(self)
         #: If strict_mode is True, raise exceptions on failures, otherwise only log errors
