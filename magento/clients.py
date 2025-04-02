@@ -4,7 +4,7 @@ import pickle
 import requests
 from functools import cached_property
 from typing import Optional, Dict, List
-
+import os
 from requests import Session
 from requests.adapters import HTTPAdapter
 from urllib3 import Retry
