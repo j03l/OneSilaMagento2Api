@@ -367,14 +367,22 @@ class Product(Model):
             self.mutable_data.setdefault('extension_attributes', {})
             stock_item = self.mutable_data['extension_attributes'].setdefault('stock_item', {})
 
-            # Update the relevant part of stock_item
-            stock_item.update({
+            to_update = {
                 "backorders": 1 if value else 0,
                 "use_config_backorders": False if value else True
-            })
+            }
+
+            if value:
+                to_update["is_in_stock"] = True
+
+            # Update the relevant part of stock_item
+            stock_item.update(to_update)
 
             if self.stock_item:
                 self.stock_item['backorders'] = 1 if value else 0
+
+                if value:
+                    self.stock_item['is_in_stock'] = True
 
     @manage_stock.setter
     @set_private_attr_after_setter
