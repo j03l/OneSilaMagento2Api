@@ -208,14 +208,14 @@ class MagentoLogger:
         :param log_file: log file name; default is {name}.log
         :param stdout_level: logging level for stdout logger; default is "INFO" (which is also logging.INFO and 10)
         :param log_requests: set to True to add logging from the requests package logger
-        :note: You can control the directory where logs are saved by setting the environment variable ``DEFAULT_LOG_DIR``.
+        :note: You can control the directory where logs are saved by setting the environment variable ``MAGENTO_DEFAULT_LOG_DIR``.
            If set, all logs will be saved in that directory unless an explicit ``log_file`` is provided.
         """
         self.name = name
         self.logger = None
         self.handler_name = None
 
-        default_log_dir = os.getenv('DEFAULT_LOG_DIR')
+        default_log_dir = os.getenv('MAGENTO_DEFAULT_LOG_DIR')
         final_log_file = log_file if log_file else f'{self.name}.log'
         if default_log_dir:
             os.makedirs(default_log_dir, exist_ok=True)
