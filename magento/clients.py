@@ -4,7 +4,6 @@ import pickle
 import requests
 from functools import cached_property
 from typing import Optional, Dict, List
-import os
 from requests import Session
 from requests.adapters import HTTPAdapter
 from urllib3 import Retry
@@ -99,10 +98,8 @@ class Client:
         self.logger: MagentoLogger = self.get_logger(
             stdout_level=log_level,
             log_file=kwargs.get('log_file', None),
-            log_dir=kwargs.get('log_dir', None),
             log_requests=kwargs.get('log_requests', True)
         )
-
         #: An initialized :class:`Store` object
         self.store: Store = Store(self)
         #: If strict_mode is True, raise exceptions on failures, otherwise only log errors
@@ -433,13 +430,7 @@ class Client:
 
         return response
 
-    def get_logger(
-            self,
-            log_file: str = None,
-            log_dir: str = None,
-            stdout_level: str = 'INFO',
-            log_requests: bool = True
-    ) -> MagentoLogger:
+    def get_logger(self, log_file: str = None, stdout_level: str = 'INFO', log_requests: bool = True) -> MagentoLogger:
         """Retrieve a MagentoLogger for the current username/domain combination. Log files are DEBUG.
 
         :param log_file: the file to log to
@@ -449,19 +440,10 @@ class Client:
         logger_name = MagentoLogger.CLIENT_LOG_NAME.format(
             domain=self.BASE_URL.split('://')[-1].split('/')[0].replace('.', '_'),
             username=self.USER_CREDENTIALS['username']
-        )
-
-        final_log_file = None
-        if log_file:
-            # Explicit path wins
-            final_log_file = log_file
-        elif log_dir:
-            os.makedirs(log_dir, exist_ok=True)
-            final_log_file = os.path.join(log_dir, f"{logger_name}.log")
-
+        )   # Example:``domain_username``
         return MagentoLogger(
             name=logger_name,
-            log_file=final_log_file,
+            log_file=log_file,
             stdout_level=stdout_level,
             log_requests=log_requests
         )

@@ -5,11 +5,17 @@ from . import utils
 from . import exceptions
 import os
 
-__version__ = "1.0.22"
+__version__ = "1.0.23"
 
 from .constants import AuthenticationMethod
 
 Client = clients.Client
+logger = utils.MagentoLogger(
+    name=utils.MagentoLogger.PACKAGE_LOG_NAME,
+    log_file=utils.MagentoLogger.PACKAGE_LOG_NAME + '.log',
+    stdout_level='WARNING'  # Clients will log to console
+)
+
 
 def get_api(**kwargs) -> Client:
     """Initialize a :class:`~.Client` using credentials stored in environment variables
@@ -32,8 +38,6 @@ def get_api(**kwargs) -> Client:
         'api_key': kwargs.get('api_key', os.getenv('MAGENTO_API_KEY')),
         'authentication_method': kwargs.get('authentication_method', AuthenticationMethod.PASSWORD.value),
         'local': kwargs.get('local', False),
-        'log_dir': kwargs.get('log_dir', None),
-        'log_file': kwargs.get('log_file', None)
     }
 
     # Check if domain is provided, which is mandatory
@@ -54,3 +58,6 @@ def get_api(**kwargs) -> Client:
 
     # Return the initialized Client
     return Client.from_dict(credentials)
+
+
+logger.debug('Initialized MyMagento')
