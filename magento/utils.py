@@ -221,39 +221,33 @@ class MagentoLogger:
             os.makedirs(default_log_dir, exist_ok=True)
             final_log_file = os.path.join(default_log_dir, os.path.basename(final_log_file))
 
+        if default_log_dir and self.name == MagentoLogger.PACKAGE_LOG_NAME:
+            final_log_file = os.path.join(default_log_dir, f"{MagentoLogger.PACKAGE_LOG_NAME}.log")
+
         self.log_file = final_log_file
         self.setup_logger(stdout_level, log_requests=log_requests)
 
     def setup_logger(self, stdout_level: Union[int, str] = 'INFO', log_requests: bool = True) -> bool:
-        """Configures a logger and assigns it to the `logger` attribute.
-
-        :param stdout_level: logging level to use for logging to console
-        :param log_requests: set to True to add logs from the requests package (ie. API call logging)
-        """
+        """Configures a logger and assigns it to the `logger` attribute."""
         logger = logging.getLogger(self.name)
-        log_files = LoggerUtils.get_log_files(logger)
         handler_map = LoggerUtils.map_handlers_by_name(logger)
 
         self.handler_name = MagentoLogger.HANDLER_NAME.format(
             name=self.name, stdout_level=stdout_level
         )
-        if self.handler_name in handler_map['stream'] and self.handler_name in handler_map['file']:
-            if self.log_path in log_files:
-                self.logger = logger  # Log levels and log files are correct
-                return True
 
+        # Add stream handler
         if self.handler_name not in handler_map['stream']:
             if len(handler_map['stream']) > 0:
                 self.clear_magento_handlers(logger, handler_type=StreamHandler)
-            # Resetting ensures only the desired level is logged to console
             stdout_handler = StreamHandler(stream=sys.stdout)
             stdout_handler.setFormatter(MagentoLogger.FORMATTER)
             stdout_handler.name = self.handler_name
             stdout_handler.setLevel(stdout_level)
             logger.addHandler(stdout_handler)
 
-        # Remove all FileHandlers created by this package (except handler for magento.log)
-        if self.handler_name not in handler_map['file'] or self.log_path not in log_files:
+        # Add file handler
+        if self.handler_name not in handler_map['file'] or self.log_path not in LoggerUtils.get_log_files(logger):
             if len(handler_map['file']) > 0:
                 self.clear_magento_file_handlers(logger)
             f_handler = FileHandler(self.log_file)
@@ -262,19 +256,15 @@ class MagentoLogger:
             f_handler.setLevel("DEBUG")
             logger.addHandler(f_handler)
 
-        if log_requests:
-            f_handler = LoggerUtils.get_handler_by_log_file(logger, self.log_file)  # In case it wasn't just created
-            MagentoLogger.add_request_logging(f_handler)
+            # Add request logging directly
+            if log_requests:
+                MagentoLogger.add_request_logging(f_handler)
 
-        if self.name != MagentoLogger.PACKAGE_LOG_NAME:  # All clients have the handler added to them
-            pkg_handler = MagentoLogger.get_package_handler()   # For writing to {PACKAGE_LOG_NAME}.log
-            logger.addHandler(pkg_handler)
-            f_handler = LoggerUtils.get_handler_by_log_file(logger, self.log_file)
-            MagentoLogger.add_request_logging(f_handler)
-
+        # Add package handler
         if self.name != MagentoLogger.PACKAGE_LOG_NAME:
             pkg_handler = MagentoLogger.get_package_handler()
-            logger.addHandler(pkg_handler)  # For writing to {PACKAGE_LOG_NAME}.log
+            if pkg_handler:
+                logger.addHandler(pkg_handler)
 
         logger.setLevel(logging.DEBUG)
         self.logger = logger
