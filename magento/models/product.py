@@ -691,7 +691,10 @@ class Product(Model):
             return False
 
         if website_attributes := self.client.store.filter_website_attrs(attribute_data):
-            return self._update_attributes({'custom_attributes': self.pack_attributes(website_attributes)}, scope='all')
+            website_scope = scope or 'all'
+            return self._update_attributes({'custom_attributes': self.pack_attributes(website_attributes)},
+                                           scope=website_scope)
+
         return True
 
     def _update_single_store(self, attribute_data: dict) -> bool:
@@ -1408,6 +1411,17 @@ class ProductAttribute(Model):
     @property
     def options(self) -> Optional[List[AttributeOption]]:
         return [AttributeOption(data=option, client=self.client, attribute=self, fetched=True) for option in self.__options if option['value'] != '']
+
+    def get_options_with_scope(self, scope=None):
+        url = self.client.url_for(
+            f'products/attributes/{self.attribute_code}/options',
+            scope=scope
+        )
+        if (response := self.client.get(url)).ok:
+            return [AttributeOption(data=option, client=self.client, attribute=self, fetched=True) for option in
+                    response.json() if option['value'] != '']
+
+        return None
 
 
 class AttributeOption(Model):

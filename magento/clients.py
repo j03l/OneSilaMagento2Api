@@ -548,6 +548,11 @@ class Store:
         return self.client.manager('store/storeViews').execute_search()
 
     @cached_property
+    def websites(self) -> Optional[APIResponse | List[APIResponse]]:
+        """Returns a list of all store views"""
+        return self.client.manager('store/websites').execute_search()
+
+    @cached_property
     def all_product_attributes(self) -> List[ProductAttribute]:
         """A cached list of all product attributes"""
         return self.client.product_attributes.all_in_memory()
