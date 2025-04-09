@@ -943,8 +943,8 @@ class MediaEntry(Model):
         if self.client.store.is_single_store:
             return super().save(add_save_options=add_save_options, refresh=refresh, multiple_scopes=[None, 'all'])
 
-        update_scopes = [config.code for config in self.configs] + ['all']
-        return super().save(add_save_options=add_save_options, refresh=refresh, update_scopes=update_scopes)
+        update_scopes = [config.code for config in self.client.store.configs] + ['all']
+        return super().save(add_save_options=add_save_options, refresh=refresh, multiple_scopes=update_scopes)
 
     def query_endpoint(self) -> None:
         """No search endpoint exists for media gallery entries"""

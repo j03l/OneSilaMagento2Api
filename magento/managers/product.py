@@ -176,6 +176,20 @@ class MediaEntryManager(MinimalManager):
     def __repr__(self):
         return f"<MediaEntryManager for {self.product.sku}>"
 
+    def create(self, data: dict, scope: Optional[str] = None) -> Optional[MediaEntry]:
+        """
+        Create a media entry for the current product.
+        If in a multi-store setup, re-save to apply fields across scopes properly.
+        """
+        # First, create the entry
+        instance = super().create(data=data, scope=scope)
+
+        # Extra step: in multi-store mode, save again to ensure scoped fields are persisted
+        if instance and not self.client.store.is_single_store:
+            instance.save(refresh=True)
+
+        return instance
+
     def by_id(self, media_id: int) -> Optional[MediaEntry]:
         """Retrieve a MediaEntry by its ID.
 
