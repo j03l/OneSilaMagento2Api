@@ -176,13 +176,13 @@ class MediaEntryManager(MinimalManager):
     def __repr__(self):
         return f"<MediaEntryManager for {self.product.sku}>"
 
-    def create(self, data: dict, scope: Optional[str] = None) -> Optional[MediaEntry]:
+    def create(self, data: dict, scope: Optional[str] = None, extra_data: Optional[dict] = None) -> Optional[MediaEntry]:
         """
         Create a media entry for the current product.
         If in a multi-store setup, re-save to apply fields across scopes properly.
         """
         # First, create the entry
-        instance = super().create(data=data, scope=scope)
+        instance = super().create(data=data, scope=scope, extra_data=extra_data)
 
         # Extra step: in multi-store mode, save again to ensure scoped fields are persisted
         if instance and not self.client.store.is_single_store:
@@ -244,6 +244,14 @@ class ProductAttributeManager(Manager):
             client=client,
             model=ProductAttribute
         )
+
+    def create(self, data: dict, scope: Optional[str] = None, extra_data: Optional[dict] = None) -> Optional[ProductAttribute]:
+        # Clean up invalid 'is_filterable' usage
+        if data.get('frontend_input') not in [ProductAttribute.ADD_TO_FILTER_ALLOWED_TYPES]:
+            data.pop('is_filterable', None)
+
+        return super().create(data=data, scope=scope, extra_data=extra_data)
+
 
     def all(self) -> Optional[List[ProductAttribute]]:
         """Retrieve a list of all :class:`~.ProductAttribute`s"""

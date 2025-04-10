@@ -1188,6 +1188,7 @@ class ProductAttribute(Model):
 
     # Allowed methods
     ALLOWED_METHODS = [ModelMethod.GET, ModelMethod.CREATE, ModelMethod.UPDATE, ModelMethod.DELETE]
+    ADD_TO_FILTER_ALLOWED_TYPES = [BOOLEAN, SELECT, MULTISELECT]
 
     ENTITY_TYPE_ID = 4
 
@@ -1326,7 +1327,12 @@ class ProductAttribute(Model):
     @is_filterable.setter
     @set_private_attr_after_setter
     def is_filterable(self, value: Optional[bool]) -> None:
-        self.mutable_data['is_filterable'] = value
+
+        if hasattr(self, 'frontend_input'):
+            if self.frontend_input in self.ADD_TO_FILTER_ALLOWED_TYPES:
+                self.mutable_data['is_filterable'] = value
+            else:
+                self.mutable_data.pop('is_filterable', None)
 
     @property
     @data_not_fetched_value(lambda self: self._is_filterable_in_search)
