@@ -5,3 +5,4 @@ from .category import CategoryManager
 from .customer import CustomerManager
 from .invoice import InvoiceManager
 from .shipment import ShipmentManager
+from .tax import TaxClassManager

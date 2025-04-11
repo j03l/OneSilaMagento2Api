@@ -7,3 +7,4 @@ from .invoice import Invoice, InvoiceItem
 from .attribute_set import AttributeSet
 from .configurable_product import ConfigurableProduct
 from .shipment import Shipment
+from .tax import TaxClass

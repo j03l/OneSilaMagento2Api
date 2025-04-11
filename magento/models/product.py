@@ -299,6 +299,16 @@ class Product(Model):
         """
         return self.extension_attributes.get('website_ids', [])
 
+    @property
+    @data_not_fetched_value(lambda self: self._tax_class_id)
+    def tax_class_id(self) -> Optional[str]:
+        """Return the tax_class_id from custom attributes, or None if not set."""
+        try:
+            # Assuming self.custom_attributes behaves as a dict-like object.
+            return self.custom_attributes.get('tax_class_id')
+        except AttributeError:
+            return None
+
     # ------------------------------------------------- PROPERTIES SETTERS (the ones that can be updateD)
 
     @name.setter
@@ -523,6 +533,28 @@ class Product(Model):
                 self.extension_attributes = {}
 
             self.extension_attributes['website_ids'] = value
+
+    @tax_class_id.setter
+    @set_private_attr_after_setter
+    def tax_class_id(self, value: Optional[str]) -> None:
+        """
+        Set the tax_class_id in custom attributes.
+        If the provided value is None, it will be converted to the string "0".
+        """
+        if value is None:
+            value = "0"
+
+        self.mutable_data.setdefault('custom_attributes', [])
+        for attr in self.mutable_data['custom_attributes']:
+            if attr['attribute_code'] == 'tax_class_id':
+                attr['value'] = value
+                break
+        else:
+            self.mutable_data['custom_attributes'].append({
+                'attribute_code': 'tax_class_id',
+                'value': value
+            })
+        self._update_internal_custom_attribute('tax_class_id', value)
 
     # ------------------------------------------------- CUSTOM METHODS
 

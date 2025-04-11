@@ -12,6 +12,7 @@ from .constants import Scope, StoreCode, AuthenticationMethod
 from .decorators import jsondecode_error_retry
 from .managers.attribute_set import AttributeSetManager
 from .managers.product import ProductAttributeOptionManager, MediaEntryManager
+from .managers.tax import TaxClassManager
 from .utils import MagentoLogger, get_agent, parse_domain
 from .models import APIResponse, ProductAttribute, Product
 from .managers import Manager, OrderManager, ProductManager, InvoiceManager, CategoryManager, ProductAttributeManager, OrderItemManager, CustomerManager, \
@@ -190,6 +191,8 @@ class Client:
             return self.order_items
         if endpoint.lower() == 'invoices':
             return self.invoices
+        if endpoint.lower() == 'taxes':
+            return self.taxes
         if endpoint.lower() == 'categories':
             return self.categories
         if endpoint.lower() == 'products':
@@ -213,6 +216,11 @@ class Client:
     def orders(self) -> OrderManager:
         """Initializes an :class:`~.OrderManager`"""
         return OrderManager(self)
+
+    @property
+    def taxes(self) -> TaxClassManager:
+        """Initializes an :class:`~.TaxClassManager`"""
+        return TaxClassManager(self)
 
     @property
     def order_items(self) -> OrderItemManager:
