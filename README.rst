@@ -456,7 +456,7 @@ The |.~.Manager|_ subclasses now handle all interactions with API endpoints, inc
             "attribute_set_id": 4,
             "price": 199.99,
         },
-        unique_field="sku"
+        identifier="sku"
     )
     if created:
         print("New product created:", product)
@@ -499,7 +499,7 @@ While predefined methods cover most use cases, you can still build custom querie
     attribute = api.product_attributes.by_code('color')
     option, created = api.product_attribute_options.get_or_create(
         data={"label": "Red", "sort_order": 1},
-        unique_field="label"
+        identifier="label"
     )
     if created:
         print("New option created:", option)
