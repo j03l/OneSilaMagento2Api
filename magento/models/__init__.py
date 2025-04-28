@@ -1,10 +1,11 @@
-from .model import Model, APIResponse, FetchedOnlyModel, ImmutableModel
-from .product import Product, MediaEntry, ProductAttribute, AttributeOption
+from .attribute_set import AttributeSet
 from .category import Category
-from .order import Order, OrderItem
+from .configurable_product import ConfigurableProduct
+from .coupon import Coupon, CouponSpec
 from .customer import Customer
 from .invoice import Invoice, InvoiceItem
-from .attribute_set import AttributeSet
-from .configurable_product import ConfigurableProduct
+from .model import APIResponse, FetchedOnlyModel, ImmutableModel, Model
+from .order import Order, OrderItem
+from .product import AttributeOption, MediaEntry, Product, ProductAttribute
 from .shipment import Shipment
 from .tax import TaxClass

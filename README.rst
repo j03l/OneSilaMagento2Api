@@ -298,6 +298,7 @@ Endpoints are wrapped with a |.~.Model|_ and |.~.Manager|_ subclass as follows:
    "``customers``", "|..Client.customers|_", "|.~.CustomerManager|_", "|.~.Customer|_"
    "``shipments``", "|..Client.shipments|_", "|.~.ShipmentManager|_", "|.~.Shipment|_"
    "``attribute_sets``", "|..Client.attribute_sets|_", "|.~.AttributeSetManager|_", "|.~.AttributeSet|_"
+   "``coupons``",    "|..Client.coupons|_",    "|.~.CouponManager|_",    "|.~.Coupon|_"
 
 ...
 
@@ -445,23 +446,42 @@ The |.~.Manager|_ subclasses now handle all interactions with API endpoints, inc
     product = api.products.create(data=product_data)
     print(product)
 
-**Using `get_or_create`**:
+**Using `get_or_create`:**
 
 .. code-block:: python
 
-    product, created = api.products.get_or_create(
-        data={
-            "sku": "existing-sku",
-            "name": "Existing Product",
-            "attribute_set_id": 4,
-            "price": 199.99,
-        },
-        identifier="sku"
-    )
-    if created:
-        print("New product created:", product)
-    else:
-        print("Product already exists:", product)
+   product, created = api.products.get_or_create(
+       data={
+           "sku": "existing-sku",
+           "name": "Existing Product",
+           "attribute_set_id": 4,
+           "price": 199.99,
+       },
+       identifier="sku"
+   )
+   if created:
+       print("New product created:", product)
+   else:
+       print("Product already exists:", product)
+
+.. code-block:: python
+
+   from magento.models.coupon import CouponSpec
+
+   # Example: Get or Create a Coupon
+   coupon_data = {
+       "rule_id": 1,
+       "code": "WELCOME10",
+       "expiration_date": "2023-12-31",
+   }
+   coupon, created = api.coupons.get_or_create(
+       data=coupon_data,
+       identifier="code"
+   )
+   if created:
+       print("New coupon created:", coupon)
+   else:
+       print("Coupon already exists:", coupon)
 
 **Saving Changes to a Model**:
 
@@ -581,10 +601,4 @@ be wrapped by  |.~.APIResponse|_ or other |.~.Model|_
      >>> print(memo)
 
      {'adjustment': 1.5, 'adjustment_negative': 0, 'adjustment_positive': 1.5, 'base_adjustment': 1.5,  ... }
-     <magento.models.model.APIResponse object at 0x000001BA42FD0FD1>
-
-.. raw:: html
-
-   </td></tr>
-   </table>
 
