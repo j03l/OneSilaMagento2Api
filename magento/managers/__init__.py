@@ -6,3 +6,5 @@ from .customer import CustomerManager
 from .invoice import InvoiceManager
 from .shipment import ShipmentManager
 from .tax import TaxClassManager
+from .coupon import CouponManager
+from .sales_rule import SalesRuleManager
