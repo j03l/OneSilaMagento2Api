@@ -48,3 +48,19 @@ class SalesRuleManager(Manager):
     def active_rules(self):
         """Retrieve all active sales rules."""
         return self.add_criteria('is_active', 1).execute_search()
+
+    def search(self, **criteria) -> list[SalesRule]:
+        """
+        Generic search on the sales‑rules endpoint.
+        Usage: srm.search(name='10% off', coupon_code='XYZ')
+        """
+        original = self.endpoint
+        try:
+            self.endpoint = f"{original}/search"
+            self.reset()
+            for field, value in criteria.items():
+                if value is not None:
+                    self.add_criteria(field, value)
+            return self.execute_search() or []
+        finally:
+            self.endpoint = original

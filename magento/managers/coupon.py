@@ -17,22 +17,41 @@ class CouponManager(Manager):
             client=client,
             model=Coupon
         )
-
-    def list_for_rule(self, rule_id: int, primary_only: bool|None = None) -> list[Coupon]:
+        
+    def search(self, **criteria) -> list[Coupon]:
         """
-        Lists generated coupons for a rule.
-        If primary_only=True, returns only the manually assigned code.
+        Generic search on the coupons endpoint.
+        Usage: cm.search(code='ABC123', rule_id=10)
         """
-        self.endpoint = f"{self.endpoint}/search"
+        original = self.endpoint
+        try:
+            self.endpoint = f"{original}/search"
+            self.reset()
+            for field, value in criteria.items():
+                if value is not None:
+                    self.add_criteria(field, value)
+            return self.execute_search() or []
+        finally:
+            self.endpoint = original
 
-        self.reset()
 
-        self.add_criteria('rule_id', rule_id)
+    def list_for_rule(self, rule_id: int, primary_only: bool | None = None) -> list[Coupon]:
+        """List all coupons for a given sales rule.
+
+        Args:
+            rule_id (int): ID of the Cart Price Rule.
+            primary_only (bool | None): 
+                - True: only the specific manually assigned coupon
+                - False: only generated coupons
+                - None: all coupons
+        Returns:
+            list[Coupon]: list of Coupon objects.
+        """
+        criteria = {'rule_id': rule_id}
         if primary_only is not None:
-            self.add_criteria('is_primary', int(primary_only))
-
-        return self.execute_search()
-
+            criteria['is_primary'] = int(primary_only)
+        return self.search(**criteria)
+    
     def generate(self,
                  rule_id: int,
                  qty: int,
@@ -43,7 +62,7 @@ class CouponManager(Manager):
                  fmt: str = 'ALPHANUMERIC'
     ) -> list[str]:
         """
-        Auto-generates new coupon codes.
+        Auto-generates new coupon codes for a given sales rule.
         """
         payload = {
             "generationSpec": {
@@ -124,3 +143,4 @@ class CouponManager(Manager):
             list[str]: coupon code strings.
         """
         return [c.code for c in self.list_for_rule(rule_id, primary_only=primary_only)]
+    
