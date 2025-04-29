@@ -23,30 +23,15 @@ class CouponManager(Manager):
         Lists generated coupons for a rule.
         If primary_only=True, returns only the manually assigned code.
         """
-        # Build the search URL for listing coupons
-        url = self.client.url_for(f"{self.endpoint}/search")
-        # Assemble query parameters for rule_id filter
-        params = {
-            'searchCriteria[filterGroups][0][filters][0][field]': 'rule_id',
-            'searchCriteria[filterGroups][0][filters][0][value]': rule_id,
-            'searchCriteria[filterGroups][0][filters][0][conditionType]': 'eq',
-            'searchCriteria[currentPage]': 1,
-            'searchCriteria[pageSize]': 100,
-        }
-        # Add is_primary filter if requested
+        self.endpoint = f"{self.endpoint}/search"
+
+        self.reset()
+
+        self.add_criteria('rule_id', rule_id)
         if primary_only is not None:
-            params.update({
-                'searchCriteria[filterGroups][1][filters][0][field]': 'is_primary',
-                'searchCriteria[filterGroups][1][filters][0][value]': int(primary_only),
-                'searchCriteria[filterGroups][1][filters][0][conditionType]': 'eq',
-            })
-        # Perform the GET request against the /search endpoint
-        response = self.client.get(url, params=params)
-        response.raise_for_status()
-        data = response.json()
-        # Map returned items to Coupon models
-        items = data.get('items', [])
-        return [self.Model(item) for item in items]
+            self.add_criteria('is_primary', int(primary_only))
+
+        return self.execute_search()
 
     def generate(self,
                  rule_id: int,
