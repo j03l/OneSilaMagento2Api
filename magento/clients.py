@@ -19,6 +19,7 @@ from .models import APIResponse, ProductAttribute, Product
 from .managers import Manager, OrderManager, ProductManager, InvoiceManager, CategoryManager, ProductAttributeManager, OrderItemManager, CustomerManager, \
     ShipmentManager
 from .exceptions import AuthenticationError, MagentoError
+from .managers.sales_rule import SalesRuleManager
 
 
 class Client:
@@ -222,10 +223,10 @@ class Client:
     def taxes(self) -> TaxClassManager:
         """Initializes an :class:`~.TaxClassManager`"""
         return TaxClassManager(self)
-    
+
     @property
     def coupons(self) -> CouponManager:
-        """Access coupon endpoints (vouchers)."""
+        """Access both specific and generated coupons."""
         return CouponManager(self)
 
     @property
@@ -521,6 +522,11 @@ class Client:
         """Prints the Client configuration settings"""
         for k, v in self.to_dict().items():
             print(f'{k} : {v}')
+
+    @property
+    def sales_rules(self) -> SalesRuleManager:
+        """Access Cart Price Rules."""
+        return SalesRuleManager(self)
 
 
 class Store:

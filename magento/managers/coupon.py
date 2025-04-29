@@ -1,92 +1,106 @@
 from __future__ import annotations
-
 from typing import TYPE_CHECKING
-
-from ..models import Coupon, CouponSpec
 from .manager import Manager
+from ..models.coupon import Coupon
 
 if TYPE_CHECKING:
     from . import Client
 
-
 class CouponManager(Manager):
-    """:class:`ManagerQuery` subclass for the ``coupons/search`` endpoint"""
-
     def __init__(self, client: Client):
-        """Initialize a :class:`CouponManager`
+        """Initialize a :class:`CustomerManager`
 
         :param client: an initialized :class:`~.Client` object
         """
-        super().__init__(endpoint="coupons/search", client=client, model=Coupon)
+        super().__init__(
+            endpoint='coupons',
+            client=client,
+            model=Coupon
+        )
 
-    def by_id(self, coupon_id: int) -> Coupon:
+    def list_for_rule(self, rule_id: int, primary_only: bool|None = None) -> list[Coupon]:
         """
-        Retrieve a coupon by its ID.
+        Lists generated coupons for a rule.
+        If primary_only=True, returns only the manually assigned code.
+        """
+        self.reset()
+        self.add_criteria('rule_id', rule_id)
+        if primary_only is not None:
+            self.add_criteria('is_primary', int(primary_only), group=self.last_group+1)
+        return self.execute_search() or []
 
-        :param coupon_id: The coupon’s unique ID.
-        :returns: The fetched :class:`Coupon`.
+    def generate(self,
+                 rule_id: int,
+                 qty: int,
+                 length: int,
+                 prefix: str = '',
+                 suffix: str = '',
+                 dash_every_x_chars: int | None = None,
+                 fmt: str = 'ALPHANUMERIC'
+    ) -> list[str]:
         """
-        self.query = self.query.replace("coupons/search", "coupons")
-        return super().by_id(coupon_id)
-
-    def generate(self, spec: CouponSpec) -> list[str]:
+        Auto-generates new coupon codes.
         """
-        Auto-generate coupon codes.
-
-        :param spec: A :class:`CouponSpec` instance with generation parameters.
-        :returns: A list of generated coupon code strings.
-        """
-        url = self.client.url_for("coupons/generate")
-        payload = {"couponSpec": spec.model_dump()}
-        response = self.client.post(url, json=payload)
+        payload = {
+            "generationSpec": {
+                "rule_id": rule_id,
+                "qty": qty,
+                "length": length,
+                "format": fmt,
+                "prefix": prefix,
+                "suffix": suffix,
+                "dash_every_x_chars": dash_every_x_chars
+            }
+        }
+        url = self.client.url_for(f"{self.endpoint}/generate")
+        response = self.client.post(url, payload)
         return response.json()
 
-    def create(self, data: dict[str, object]) -> Coupon:
+    def create_specific_coupon(self, rule_id: int, coupon_code: str) -> Coupon:
         """
-        Create a specific coupon code.
+        Creates a specific coupon for a given sales rule.
 
-        :param data: Fields for the new coupon,
-            e.g. {"rule_id": ..., "code": "...", ...}.
-        :returns: The created :class:`Coupon` object.
-        :raises ApiError: On HTTP error or validation failure.
-        """
-        endpoint = self.endpoint.replace("/search", "")
-        url = self.client.url_for(endpoint)
-        resp = self.client.post(url, json={"coupon": data})
-        return Coupon(**resp.json())
+        Args:
+            rule_id (int): The ID of the sales rule.
+            coupon_code (str): The specific coupon code to create.
 
-    def update(self, coupon_id: int, data: dict[str, object]) -> Coupon:
+        Returns:
+            Coupon: The created coupon object.
         """
-        Update an existing coupon.
+        payload = {
+            "rule_id": rule_id,
+            "code": coupon_code,
+            "is_primary": True
+        }
+        url = self.client.url_for(self.endpoint)
+        response = self.client.post(url, payload)
+        return self.Model(response.json())
 
-        :param coupon_id: ID of the coupon to update.
-        :param data: Fields to modify.
-        :returns: The updated :class:`Coupon`.
+    def update_specific_coupon(self, coupon_id: int, updates: dict) -> Coupon:
         """
-        endpoint = self.endpoint.replace("/search", "")
-        url = self.client.url_for(f"{endpoint}/{coupon_id}")
-        resp = self.client.put(url, json={"coupon": data})
-        return Coupon(**resp.json())
+        Updates a specific coupon by its ID.
 
-    def delete(self, coupon_id: int) -> None:
-        """
-        Delete a coupon by ID.
+        Args:
+            coupon_id (int): The ID of the coupon to update.
+            updates (dict): A dictionary of fields to update (e.g., {'code': 'NEWCODE2025'}).
 
-        :param coupon_id: The coupon’s ID.
+        Returns:
+            Coupon: The updated coupon object.
         """
-        endpoint = self.endpoint.replace("/search", "")
-        url = self.client.url_for(f"{endpoint}/{coupon_id}")
-        self.client.delete(url)
+        url = self.client.url_for(f"{self.endpoint}/{coupon_id}")
+        response = self.client.put(url, updates)
+        return self.Model(response.json())
 
-    def search(self, **search_criteria) -> list[Coupon]:
+    def delete_coupon(self, coupon_id: int) -> bool:
         """
-        Search for coupons matching criteria.
+        Deletes a coupon by its ID.
 
-        :param search_criteria: Keyword search criteria (see Magento SearchCriteria format).
-        :returns: A list of :class:`Coupon` objects.
+        Args:
+            coupon_id (int): The ID of the coupon to delete.
+
+        Returns:
+            bool: True if the deletion was successful, False otherwise.
         """
-        resp = self.client.get(
-            self.client.url_for(self.endpoint), params=search_criteria
-        )
-        items = resp.json().get("items", [])
-        return [Coupon(**item) for item in items]
+        url = self.client.url_for(f"{self.endpoint}/{coupon_id}")
+        response = self.client.delete(url)
+        return response.status_code == 200

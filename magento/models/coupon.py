@@ -2,32 +2,15 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING, Dict, Optional
 
-from pydantic import BaseModel
-
 if TYPE_CHECKING:
     from magento import Client
 
 from . import ImmutableModel
 
 
-class CouponSpec(BaseModel):
-    """Specification for auto-generating coupon codes.
-
-    :param rule_id: The ID of the cart price rule to attach coupons to.
-    :type rule_id: int
-    :param quantity: Number of codes to generate.
-    :type quantity: int
-    :param length: Length of each generated code.
-    :type length: int
-    """
-
-    rule_id: int
-    quantity: int
-    length: int
-
-
 class Coupon(ImmutableModel):
     """Wrapper for the ``coupons`` endpoint.
+    Wraps a single coupon code resource.
 
     :param data: API response from the ``coupons`` endpoint
     :param client: an initialized :class:`~.Client` object
@@ -35,6 +18,8 @@ class Coupon(ImmutableModel):
 
     DOCUMENTATION = "https://adobe-commerce.redoc.ly/2.4.8-admin/tag/coupons"
     IDENTIFIER = "coupon_id"
+    PAYLOAD_PREFIX = 'coupon'
+   
 
     def __init__(self, data: Dict, client: Client, fetched: bool = False):
         """Initialize a Coupon object using an API response from the ``coupons`` endpoint

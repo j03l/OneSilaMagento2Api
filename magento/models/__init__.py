@@ -8,4 +8,5 @@ from .attribute_set import AttributeSet
 from .configurable_product import ConfigurableProduct
 from .shipment import Shipment
 from .tax import TaxClass
-from .coupon import Coupon, CouponSpec
+from .coupon import Coupon
+from .sales_rule import SalesRule
