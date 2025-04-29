@@ -1,10 +1,12 @@
+from __future__ import annotations
 from typing import TYPE_CHECKING
-from .model import Model
 
 if TYPE_CHECKING:
     from magento import Client
+    
+from . import ImmutableModel
 
-class SalesRule(Model):
+class SalesRule(ImmutableModel):
     """Wraps a Cart Price Rule (salesRules) response."""
     IDENTIFIER = 'rule_id'
     PAYLOAD_PREFIX = 'rule'

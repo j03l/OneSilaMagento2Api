@@ -1,9 +1,10 @@
+from __future__ import annotations
 from typing import TYPE_CHECKING
 from .manager import Manager
 from ..models.sales_rule import SalesRule
 
 if TYPE_CHECKING:
-    from magento import Client
+    from . import Client
 
 class SalesRuleManager(Manager):
     def __init__(self, client: Client):
