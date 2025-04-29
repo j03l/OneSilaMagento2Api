@@ -27,6 +27,20 @@ class SalesRuleManager(Manager):
         # coupon_type == 2 indicates Specific Coupon
         return rule.coupon_code if getattr(rule, 'coupon_type', None) == 2 else None
 
+    def get_coupons(self, rule_id: int, primary_only: bool | None = None) -> list[str]:
+        """
+        List all coupons for a given sales rule.
+        Uses the CouponManager internally to return both specific and generated codes.
+
+        Args:
+            rule_id (int): ID of the Cart Price Rule.
+            primary_only (bool | None): If True, return only the specific primary coupon; if False, only generated coupons; if None, all coupons.
+
+        Returns:
+            list[str]: coupon code strings.
+        """
+        return self.client.coupons.list_for_rule(rule_id, primary_only=primary_only)
+
     def by_name(self, name: str):
         """Retrieve sales rules by their name."""
         return self.add_criteria('name', name).execute_search()
@@ -34,7 +48,3 @@ class SalesRuleManager(Manager):
     def active_rules(self):
         """Retrieve all active sales rules."""
         return self.add_criteria('is_active', 1).execute_search()
-
-    def by_coupon_code(self, coupon_code: str):
-        """Retrieve sales rules associated with a specific coupon code."""
-        return self.add_criteria('coupon_code', coupon_code).execute_search()

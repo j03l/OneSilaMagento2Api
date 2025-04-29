@@ -104,3 +104,19 @@ class CouponManager(Manager):
         url = self.client.url_for(f"{self.endpoint}/{coupon_id}")
         response = self.client.delete(url)
         return response.status_code == 200
+
+
+    def list_codes_for_rule(self, rule_id: int, primary_only: bool | None = None) -> list[str]:
+        """Return just the coupon code strings for a given rule.
+
+        Args:
+            rule_id (int): ID of the Cart Price Rule.
+            primary_only (bool | None): 
+                - True: only the manually assigned coupon
+                - False: only generated coupons
+                - None: all coupons
+
+        Returns:
+            list[str]: coupon code strings.
+        """
+        return [c.code for c in self.list_for_rule(rule_id, primary_only=primary_only)]

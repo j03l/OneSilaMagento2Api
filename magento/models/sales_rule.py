@@ -32,6 +32,16 @@ class SalesRule(ImmutableModel):
         """Returns the type of coupon associated with the sales rule."""
         return getattr(self, 'coupon_type', 'Unknown')
 
-    def get_coupons(self):
-        """Retrieve all coupons associated with this sales rule."""
-        return self.client.coupons.list_for_rule(self.rule_id)
+    def get_coupons(self, primary_only: bool | None = None) -> list[str]:
+        """List coupon codes for this rule.
+
+        Args:
+            primary_only (bool | None): 
+                - True: only the specific manually assigned coupon
+                - False: only generated coupons
+                - None: all coupons
+
+        Returns:
+            list[str]: the coupon code strings.
+        """
+        return self.client.coupons.list_for_rule(self.rule_id, primary_only=primary_only)
