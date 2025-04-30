@@ -1,0 +1,17 @@
+{
+    "python.analysis.autoImportCompletions": false,
+    "python.analysis.fixAll": [
+        "source.unusedImports"
+    ],
+    "editor.formatOnPaste": false,
+    "editor.formatOnSave": false,
+    "editor.formatOnType": false,
+    "editor.defaultFormatter": "ms-python.black-formatter",
+    "[python]": {
+        "editor.defaultFormatter": "ms-python.black-formatter",
+        "editor.formatOnSave": false,
+        "editor.codeActionsOnSave": {
+            "source.organizeImports": "explicit"
+        },
+    },
+}
