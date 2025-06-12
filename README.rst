@@ -320,6 +320,45 @@ Full documentation can be found on `ReadTheDocs <https://my-magento.readthedocs.
 
 |
 
+🔧 Logging Configuration
+~~~~~~~~~~~~~~~~~~~~~~~~
+
+``OneSilaMagento2Api`` provides comprehensive logging capabilities with flexible configuration options:
+
+**Disable File Logging**
+
+You can completely disable `.log` file creation while preserving console logging:
+
+.. code-block:: python
+
+   # Disable file logging via Client
+   api = magento.Client(domain='...', username='...', password='...', 
+                        disable_file_logging=True)
+   
+   # Disable file logging via get_api()
+   api = magento.get_api(disable_file_logging=True)
+
+**Environment Variables for Log Management**
+
+Set a custom directory for all log files using the ``MAGENTO_DEFAULT_LOG_DIR`` environment variable:
+
+.. code-block:: python
+
+   import os
+   
+   os.environ['MAGENTO_DEFAULT_LOG_DIR'] = '/path/to/logs'
+   api = magento.get_api(domain='...', username='...', password='...')
+
+**Logging Features**
+
+* **Dual logging**: Both console (stdout) and file logging with independent level control
+* **Client-specific logs**: Each domain/username combination gets its own log file
+* **Package logging**: Automatic package logger (``my-magento.log``) for tracking all package activity
+* **Request logging**: Optional integration with ``requests`` package logging for API debugging
+* **Backward compatibility**: All existing logging functionality is preserved
+
+|
+
 QuickStart: Login with MyMagento
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
