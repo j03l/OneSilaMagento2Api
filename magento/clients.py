@@ -39,6 +39,7 @@ class Client:
             login: bool = True,
             strict_mode: bool = True,
             authentication_method: AuthenticationMethod = AuthenticationMethod.PASSWORD.value,
+            disable_file_logging: bool = False,
             **kwargs
     ):
         """Initialize a Client
@@ -68,6 +69,7 @@ class Client:
         :param kwargs: see below
         :param strict_mode: if ``True``, raises exceptions on operation failures; if ``False``, only logs errors
         :param authentication_type: WE can chose if we want to authenticate via username & password / api key
+        :param disable_file_logging: if ``True``, disables file logging; if ``False`` (default), enables file logging
         ...
 
         :Extra Keyword Arguments:
@@ -98,10 +100,12 @@ class Client:
         #: The user agent to use in requests
         self.user_agent: str = user_agent if user_agent else get_agent()
         #: The :class:`~.MagentoLogger` for the domain/username combination
+        log_file = kwargs.get('log_file', None)
         self.logger: MagentoLogger = self.get_logger(
             stdout_level=log_level,
-            log_file=kwargs.get('log_file', None),
-            log_requests=kwargs.get('log_requests', True)
+            log_file=log_file,
+            log_requests=kwargs.get('log_requests', True),
+            disable_file_logging=disable_file_logging
         )
         #: An initialized :class:`Store` object
         self.store: Store = Store(self)
@@ -445,12 +449,13 @@ class Client:
 
         return response
 
-    def get_logger(self, log_file: str = None, stdout_level: str = 'INFO', log_requests: bool = True) -> MagentoLogger:
+    def get_logger(self, log_file: str = None, stdout_level: str = 'INFO', log_requests: bool = True, disable_file_logging: bool = False) -> MagentoLogger:
         """Retrieve a MagentoLogger for the current username/domain combination. Log files are DEBUG.
 
         :param log_file: the file to log to
         :param stdout_level: the logging level for stdout logging
         :param log_requests: if ``True``, adds the :class:`~.FileHandler` to the :mod:`~.urllib3.connectionpool` logger
+        :param disable_file_logging: if ``True``, disables file logging for this logger
         """
         logger_name = MagentoLogger.CLIENT_LOG_NAME.format(
             domain=self.BASE_URL.split('://')[-1].split('/')[0].replace('.', '_'),
@@ -460,7 +465,8 @@ class Client:
             name=logger_name,
             log_file=log_file,
             stdout_level=stdout_level,
-            log_requests=log_requests
+            log_requests=log_requests,
+            disable_file_logging=disable_file_logging
         )
 
     @property

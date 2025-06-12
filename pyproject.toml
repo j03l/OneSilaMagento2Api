@@ -1,0 +1,20 @@
+[build-system]
+requires = ["setuptools", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "my-magento"
+version = "1.0.28"
+description = "Python Magento 2 REST API Wrapper - OneSila Fork"
+authors = [{name = "Adam Korn", email = "hello@dailykitten.net"}]
+dependencies = [
+    "requests>=2.27.1",
+    "python-dotenv"
+]
+requires-python = ">=3.10"
+readme = "README.rst"
+keywords = ["magento", "magento-api", "python-magento", "python", "python3", "magento-python", "pymagento", "py-magento", "magento2", "magento-2", "magento2-api"]
+
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["magento*"]

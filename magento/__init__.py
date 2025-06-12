@@ -38,6 +38,7 @@ def get_api(**kwargs) -> Client:
         'api_key': kwargs.get('api_key', os.getenv('MAGENTO_API_KEY')),
         'authentication_method': kwargs.get('authentication_method', AuthenticationMethod.PASSWORD.value),
         'local': kwargs.get('local', False),
+        'disable_file_logging': kwargs.get('disable_file_logging', False),
     }
 
     # Check if domain is provided, which is mandatory
@@ -55,6 +56,11 @@ def get_api(**kwargs) -> Client:
 
     else:
         raise ValueError(f"Unsupported authentication method: {credentials['authentication_method']}")
+
+    # Pass through any additional kwargs
+    for key, value in kwargs.items():
+        if key not in credentials:
+            credentials[key] = value
 
     # Return the initialized Client
     return Client.from_dict(credentials)

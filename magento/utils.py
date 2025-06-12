@@ -8,7 +8,6 @@ import functools
 from typing import Union, List, Type, Optional
 from logging import Logger, FileHandler, StreamHandler, Handler
 
-
 DEFAULT_USER_AGENT = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0.0.0 Safari/537.36'
 
 
@@ -195,7 +194,7 @@ class MagentoLogger:
         datefmt="%Y-%m-%d %H:%M:%S"
     )
 
-    def __init__(self, name: str, log_file: str = None, stdout_level: Union[int, str] = 'INFO', log_requests: bool = True):
+    def __init__(self, name: str, log_file: str = None, stdout_level: Union[int, str] = 'INFO', log_requests: bool = True, disable_file_logging: bool = False):
 
         """Initialize the logger
 
@@ -208,6 +207,7 @@ class MagentoLogger:
         :param log_file: log file name; default is {name}.log
         :param stdout_level: logging level for stdout logger; default is "INFO" (which is also logging.INFO and 10)
         :param log_requests: set to True to add logging from the requests package logger
+        :param disable_file_logging: if True, disables file logging entirely (only console logging)
         :note: You can control the directory where logs are saved by setting the environment variable ``MAGENTO_DEFAULT_LOG_DIR``.
            If set, all logs will be saved in that directory unless an explicit ``log_file`` is provided.
         """
@@ -215,16 +215,24 @@ class MagentoLogger:
         self.logger = None
         self.handler_name = None
 
-        default_log_dir = os.getenv('MAGENTO_DEFAULT_LOG_DIR')
-        final_log_file = log_file if log_file else f'{self.name}.log'
-        if default_log_dir:
-            os.makedirs(default_log_dir, exist_ok=True)
-            final_log_file = os.path.join(default_log_dir, os.path.basename(final_log_file))
+        # Handle file logging configuration
+        if disable_file_logging and log_file is None:
+            # User explicitly disabled file logging and no explicit log_file provided
+            self.log_file = None
+        else:
+            # Enable file logging, or explicit log_file overrides disable_file_logging
+            default_log_dir = os.getenv('MAGENTO_DEFAULT_LOG_DIR')
+            final_log_file = log_file if log_file else f'{self.name}.log'
+            
+            if default_log_dir:
+                os.makedirs(default_log_dir, exist_ok=True)
+                final_log_file = os.path.join(default_log_dir, os.path.basename(final_log_file))
 
-        if default_log_dir and self.name == MagentoLogger.PACKAGE_LOG_NAME:
-            final_log_file = os.path.join(default_log_dir, f"{MagentoLogger.PACKAGE_LOG_NAME}.log")
+            if default_log_dir and self.name == MagentoLogger.PACKAGE_LOG_NAME:
+                final_log_file = os.path.join(default_log_dir, f"{MagentoLogger.PACKAGE_LOG_NAME}.log")
 
-        self.log_file = final_log_file
+            self.log_file = final_log_file
+        self.disable_file_logging = disable_file_logging
         self.setup_logger(stdout_level, log_requests=log_requests)
 
     def setup_logger(self, stdout_level: Union[int, str] = 'INFO', log_requests: bool = True) -> bool:
@@ -246,22 +254,23 @@ class MagentoLogger:
             stdout_handler.setLevel(stdout_level)
             logger.addHandler(stdout_handler)
 
-        # Add file handler
-        if self.handler_name not in handler_map['file'] or self.log_path not in LoggerUtils.get_log_files(logger):
-            if len(handler_map['file']) > 0:
-                self.clear_magento_file_handlers(logger)
-            f_handler = FileHandler(self.log_file)
-            f_handler.setFormatter(MagentoLogger.FORMATTER)
-            f_handler.name = self.handler_name
-            f_handler.setLevel("DEBUG")
-            logger.addHandler(f_handler)
+        # Add file handler (only if log_file is specified)
+        if self.log_file is not None:
+            if self.handler_name not in handler_map['file'] or self.log_path not in LoggerUtils.get_log_files(logger):
+                if len(handler_map['file']) > 0:
+                    self.clear_magento_file_handlers(logger)
+                f_handler = FileHandler(self.log_file)
+                f_handler.setFormatter(MagentoLogger.FORMATTER)
+                f_handler.name = self.handler_name
+                f_handler.setLevel("DEBUG")
+                logger.addHandler(f_handler)
 
-            # Add request logging directly
-            if log_requests:
-                MagentoLogger.add_request_logging(f_handler)
+                # Add request logging directly
+                if log_requests:
+                    MagentoLogger.add_request_logging(f_handler)
 
-        # Add package handler
-        if self.name != MagentoLogger.PACKAGE_LOG_NAME:
+        # Add package handler (only if file logging is not disabled)
+        if self.name != MagentoLogger.PACKAGE_LOG_NAME and not self.disable_file_logging:
             pkg_handler = MagentoLogger.get_package_handler()
             if pkg_handler:
                 logger.addHandler(pkg_handler)
@@ -333,7 +342,7 @@ class MagentoLogger:
 
     @property
     def log_path(self):
-        return os.path.abspath(self.log_file)
+        return os.path.abspath(self.log_file) if self.log_file is not None else None
 
     @staticmethod
     def get_magento_handlers(logger):
@@ -375,8 +384,16 @@ class MagentoLogger:
         pkg_handlers = logging.getLogger(MagentoLogger.PACKAGE_LOG_NAME).handlers
         for handler in pkg_handlers:
             if isinstance(handler, FileHandler):
-                if handler.baseFilename == os.path.abspath(MagentoLogger.PACKAGE_LOG_NAME + '.log'):
+                # Handle both cases: explicit log file path and None (no file logging)
+                default_log_dir = os.getenv('MAGENTO_DEFAULT_LOG_DIR')
+                if default_log_dir:
+                    expected_path = os.path.abspath(os.path.join(default_log_dir, MagentoLogger.PACKAGE_LOG_NAME + '.log'))
+                else:
+                    expected_path = os.path.abspath(MagentoLogger.PACKAGE_LOG_NAME + '.log')
+
+                if handler.baseFilename == expected_path:
                     return handler
+        return None
 
     @staticmethod
     def add_request_logging(handler: Union[FileHandler, StreamHandler]):
