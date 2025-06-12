@@ -18,3 +18,8 @@ keywords = ["magento", "magento-api", "python-magento", "python", "python3", "ma
 [tool.setuptools.packages.find]
 where = ["."]
 include = ["magento*"]
+
+[dependency-groups]
+dev = [
+    "pytest>=8.4.0",
+]
