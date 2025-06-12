@@ -34,7 +34,7 @@ class Coupon(ImmutableModel):
 
     def get_rule(self):
         """Retrieve the cart price rule associated with this coupon"""
-        return self.client.rules.by_id(self.rule_id)
+        return self.client.sales_rules.by_id(self.rule_id)
 
     @property
     def remaining_uses(self) -> Optional[int]:

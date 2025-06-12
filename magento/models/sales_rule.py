@@ -1,5 +1,5 @@
 from __future__ import annotations
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, List, Optional
 
 if TYPE_CHECKING:
     from magento import Client
@@ -32,16 +32,16 @@ class SalesRule(ImmutableModel):
         """Returns the type of coupon associated with the sales rule."""
         return getattr(self, 'coupon_type', 'Unknown')
 
-    def get_coupons(self, primary_only: bool | None = None) -> list[str]:
-        """List coupon codes for this rule.
+    def get_coupons(self, primary_only: Optional[bool] = None) -> List['Coupon']:
+        """List coupon objects for this rule.
 
         Args:
-            primary_only (bool | None): 
+            primary_only (Optional[bool]): 
                 - True: only the specific manually assigned coupon
                 - False: only generated coupons
                 - None: all coupons
 
         Returns:
-            list[str]: the coupon code strings.
+            List[Coupon]: the coupon objects.
         """
         return self.client.coupons.list_for_rule(self.rule_id, primary_only=primary_only)

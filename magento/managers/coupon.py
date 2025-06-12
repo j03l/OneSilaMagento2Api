@@ -1,5 +1,5 @@
 from __future__ import annotations
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, List, Union, Dict, Optional
 from .manager import Manager
 from ..models.coupon import Coupon
 
@@ -8,7 +8,7 @@ if TYPE_CHECKING:
 
 class CouponManager(Manager):
     def __init__(self, client: Client):
-        """Initialize a :class:`CustomerManager`
+        """Initialize a :class:`CouponManager`
 
         :param client: an initialized :class:`~.Client` object
         """
@@ -18,7 +18,7 @@ class CouponManager(Manager):
             model=Coupon
         )
         
-    def search(self, **criteria) -> list[Coupon]:
+    def search(self, **criteria) -> List[Coupon]:
         """
         Generic search on the coupons endpoint.
         Usage: cm.search(code='ABC123', rule_id=10)
@@ -35,7 +35,7 @@ class CouponManager(Manager):
             self.endpoint = original
 
 
-    def list_for_rule(self, rule_id: int, primary_only: bool | None = None) -> list[Coupon]:
+    def list_for_rule(self, rule_id: int, primary_only: Optional[bool] = None) -> List[Coupon]:
         """List all coupons for a given sales rule.
 
         Args:
@@ -45,7 +45,7 @@ class CouponManager(Manager):
                 - False: only generated coupons
                 - None: all coupons
         Returns:
-            list[Coupon]: list of Coupon objects.
+            List[Coupon]: list of Coupon objects.
         """
         criteria = {'rule_id': rule_id}
         if primary_only is not None:
@@ -58,9 +58,9 @@ class CouponManager(Manager):
                  length: int,
                  prefix: str = '',
                  suffix: str = '',
-                 dash_every_x_chars: int | None = None,
+                 dash_every_x_chars: Optional[int] = None,
                  fmt: str = 'ALPHANUMERIC'
-    ) -> list[str]:
+    ) -> List[str]:
         """
         Auto-generates new coupon codes for a given sales rule.
         """
@@ -97,7 +97,7 @@ class CouponManager(Manager):
         }
         url = self.client.url_for(self.endpoint)
         response = self.client.post(url, payload)
-        return self.Model(response.json())
+        return self.Model(response.json(), self.client)
 
     def update_specific_coupon(self, coupon_id: int, updates: dict) -> Coupon:
         """
@@ -112,7 +112,7 @@ class CouponManager(Manager):
         """
         url = self.client.url_for(f"{self.endpoint}/{coupon_id}")
         response = self.client.put(url, updates)
-        return self.Model(response.json())
+        return self.Model(response.json(), self.client)
 
     def delete_coupon(self, coupon_id: int) -> bool:
         """
@@ -129,7 +129,7 @@ class CouponManager(Manager):
         return response.status_code == 200
 
 
-    def list_codes_for_rule(self, rule_id: int, primary_only: bool | None = None) -> list[str]:
+    def list_codes_for_rule(self, rule_id: int, primary_only: Optional[bool] = None) -> List[str]:
         """Return just the coupon code strings for a given rule.
 
         Args:
@@ -140,7 +140,7 @@ class CouponManager(Manager):
                 - None: all coupons
 
         Returns:
-            list[str]: coupon code strings.
+            List[str]: coupon code strings.
         """
         return [c.code for c in self.list_for_rule(rule_id, primary_only=primary_only)]
     

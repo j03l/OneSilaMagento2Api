@@ -233,8 +233,8 @@ def test_package_logger_creates_files_by_default():
 
 def test_package_logger():
     """Test package logger with file logging disabled by default"""
-    logger.debug('Verifying package log file configuration...')
     pkg_logger = magento.logger
+    pkg_logger.debug('Verifying package log file configuration...')
     pkg_log_files = LoggerUtils.get_log_files(pkg_logger.logger)
 
     assert pkg_logger.name == PKG_LOG_NAME
@@ -245,14 +245,14 @@ def test_package_logger():
     file_handlers = LoggerUtils.get_file_handlers(pkg_logger.logger)
     assert len(file_handlers) > 0, f"Expected file handlers by default, found: {len(file_handlers)}"
 
-    logger.debug('Package logger has file logging by default')
+    pkg_logger.debug('Package logger has file logging by default')
 
-    logger.debug('Verifying Package logger stdout configuration...')
+    pkg_logger.debug('Verifying Package logger stdout configuration...')
     pkg_stream_handlers = LoggerUtils.get_stream_handlers(pkg_logger.logger)
     assert len(pkg_stream_handlers) == 1
     assert pkg_stream_handlers[0].level == logging.WARNING
     assert pkg_stream_handlers[0].name == PKG_HANDLER_NAME
-    logger.debug('Package StreamHandler is configured correctly')
+    pkg_logger.debug('Package StreamHandler is configured correctly')
 
 
 def test_package_logger_with_env_var():
@@ -279,7 +279,7 @@ def test_package_logger_with_env_var():
             pkg_logger.info("Test message with env var")
             assert os.path.exists(pkg_logger.log_file), f"Log file should exist at: {pkg_logger.log_file}"
 
-            logger.debug('Package logger with MAGENTO_DEFAULT_LOG_DIR works correctly')
+            pkg_logger.debug('Package logger with MAGENTO_DEFAULT_LOG_DIR works correctly')
 
         finally:
             os.chdir(original_cwd)
