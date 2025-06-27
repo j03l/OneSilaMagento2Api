@@ -261,6 +261,11 @@ class CouponManager(Manager):
             if coupon.expiration_date:
                 try:
                     exp_date = datetime.fromisoformat(coupon.expiration_date)
+                    
+                    # Ensure expiration date is timezone-aware for consistent comparison
+                    if exp_date.tzinfo is None:
+                        exp_date = exp_date.replace(tzinfo=timezone.utc)
+                        
                     if exp_date <= cutoff_date and not coupon.is_expired:
                         expiring_coupons.append(coupon)
                 except (ValueError, TypeError):
@@ -286,6 +291,13 @@ class CouponManager(Manager):
         try:
             start = datetime.fromisoformat(start_date)
             end = datetime.fromisoformat(end_date)
+            
+            # Ensure both dates are timezone-aware for consistent comparisons
+            if start.tzinfo is None:
+                start = start.replace(tzinfo=timezone.utc)
+            if end.tzinfo is None:
+                end = end.replace(tzinfo=timezone.utc)
+                
         except (ValueError, TypeError):
             raise ValueError("Invalid date format. Use ISO format (YYYY-MM-DD or YYYY-MM-DDTHH:MM:SS)")
         
@@ -294,6 +306,11 @@ class CouponManager(Manager):
             if coupon.created_at:
                 try:
                     created = datetime.fromisoformat(coupon.created_at)
+                    
+                    # Ensure created date is timezone-aware for consistent comparison
+                    if created.tzinfo is None:
+                        created = created.replace(tzinfo=timezone.utc)
+                        
                     if start <= created <= end:
                         filtered_coupons.append(coupon)
                 except (ValueError, TypeError):

@@ -98,6 +98,42 @@ MAGENTO_USER_AGENT=custom-agent  # Optional custom user agent
 - `add_criteria(field, value, condition)`: Add search criteria
 - `since(date)`, `until(date)`: Date range filters
 
+### CouponManager Specialized Methods
+#### Core Retrieval Methods
+- `by_code(code)`: Retrieve coupon by code
+- `by_codes(codes)`: Retrieve multiple coupons by codes
+- `list_for_rule(rule_id, primary_only=None)`: List all coupons for a sales rule
+- `list_codes_for_rule(rule_id, primary_only=None)`: Get coupon code strings for a rule
+
+#### Coupon Lifecycle Management
+- `generate(rule_id, qty, length, ...)`: Auto-generate coupon codes
+- `create_specific_coupon(rule_id, coupon_code)`: Create specific coupon for a rule
+- `update_specific_coupon(coupon_id, updates)`: Update coupon by ID
+- `delete_coupon(coupon_id)`: Delete single coupon by ID
+- `delete_by_codes(codes)`: Bulk delete by coupon codes
+- `delete_by_ids(ids)`: Bulk delete by coupon IDs
+
+#### Status & Analytics Methods
+- `active_coupons()`: Get non-expired, non-exhausted coupons
+- `expired_coupons()`: Get expired coupons
+- `exhausted_coupons()`: Get coupons that reached usage limit
+- `expiring_soon(days=7)`: Get coupons expiring within N days
+- `created_between(start, end)`: Get coupons created in date range
+- `most_used(limit=10)`: Get most frequently used coupons
+- `unused()`: Get coupons that have never been used
+- `by_usage_range(min_uses, max_uses)`: Get coupons within usage range
+- `usage_statistics(rule_id=None)`: Get usage analytics
+- `count()`: Total number of coupons
+- `count_by_rule(rule_id)`: Number of coupons for specific rule
+
+#### Enhanced Model Properties (Coupon class)
+- `remaining_uses`: Number of uses remaining before limit
+- `is_exhausted`: Whether coupon reached usage limit
+- `is_expired`: Whether coupon is expired
+- `days_remaining`: Days until expiration
+- `rule`: Get associated cart price rule
+- `get_rule()`: Retrieve cart price rule for this coupon
+
 ## Authentication
 
 Two authentication methods are supported:

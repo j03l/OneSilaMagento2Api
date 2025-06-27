@@ -58,7 +58,17 @@ class Coupon(ImmutableModel):
         from datetime import datetime, timezone
 
         exp = datetime.fromisoformat(self.expiration_date)
-        return exp < datetime.now(timezone.utc)
+        now = datetime.now(timezone.utc)
+        
+        # Handle timezone-aware vs naive datetime comparison
+        if exp.tzinfo is None:
+            # If expiration date is naive, assume UTC and make it aware
+            exp = exp.replace(tzinfo=timezone.utc)
+        elif now.tzinfo is None:
+            # If now is naive (shouldn't happen), make it UTC aware
+            now = now.replace(tzinfo=timezone.utc)
+            
+        return exp < now
 
     @property
     def days_remaining(self) -> Optional[int]:
@@ -68,7 +78,17 @@ class Coupon(ImmutableModel):
         from datetime import datetime, timezone
 
         exp = datetime.fromisoformat(self.expiration_date)
-        delta = exp - datetime.now(timezone.utc)
+        now = datetime.now(timezone.utc)
+        
+        # Handle timezone-aware vs naive datetime comparison
+        if exp.tzinfo is None:
+            # If expiration date is naive, assume UTC and make it aware
+            exp = exp.replace(tzinfo=timezone.utc)
+        elif now.tzinfo is None:
+            # If now is naive (shouldn't happen), make it UTC aware
+            now = now.replace(tzinfo=timezone.utc)
+            
+        delta = exp - now
         return max(delta.days, 0)
 
     @property
