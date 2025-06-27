@@ -31,7 +31,15 @@ class CouponManager(Manager):
             for field, value in criteria.items():
                 if value is not None:
                     self.add_criteria(field, value)
-            return self.execute_search() or []
+            results = self.execute_search() or []
+            
+            # Handle case where API returns single object instead of list
+            if not results:
+                return []
+            elif isinstance(results, list):
+                return results
+            else:
+                return [results]
         finally:
             self.endpoint = original
 
@@ -51,7 +59,15 @@ class CouponManager(Manager):
         criteria = {'rule_id': rule_id}
         if primary_only is not None:
             criteria['is_primary'] = int(primary_only)
-        return self.search(**criteria)
+        results = self.search(**criteria)
+        
+        # Handle case where API returns single object instead of list
+        if not results:
+            return []
+        elif isinstance(results, list):
+            return results
+        else:
+            return [results]
     
     def generate(self,
                  rule_id: int,
@@ -140,6 +156,10 @@ class CouponManager(Manager):
             Optional[Coupon]: The coupon object if found, None otherwise.
         """
         results = self.search(code=code)
+        if not results:
+            return None
+        # The search method already handles the case where API returns single object
+        # and always returns a list, so we can safely access the first element
         return results[0] if results else None
 
     def by_codes(self, codes: List[str]) -> List[Coupon]:
