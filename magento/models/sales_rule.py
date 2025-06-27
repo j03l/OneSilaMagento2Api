@@ -3,7 +3,7 @@ from typing import TYPE_CHECKING, List, Optional
 
 if TYPE_CHECKING:
     from magento import Client
-    
+
 from . import ImmutableModel
 
 class SalesRule(ImmutableModel):
@@ -25,18 +25,28 @@ class SalesRule(ImmutableModel):
     @property
     def is_active(self) -> bool:
         """Indicates whether the sales rule is active."""
-        return getattr(self, 'is_active', False)
+        return getattr(self, '_is_active', False)
+
+    @is_active.setter
+    def is_active(self, value):
+        """Set the is_active status."""
+        self._is_active = bool(value)
 
     @property
     def coupon_type(self) -> str:
         """Returns the type of coupon associated with the sales rule."""
-        return getattr(self, 'coupon_type', 'Unknown')
+        return getattr(self, '_coupon_type', 'Unknown')
+
+    @coupon_type.setter
+    def coupon_type(self, value):
+        """Set the coupon type."""
+        self._coupon_type = str(value)
 
     def get_coupons(self, primary_only: Optional[bool] = None) -> List['Coupon']:
         """List coupon objects for this rule.
 
         Args:
-            primary_only (Optional[bool]): 
+            primary_only (Optional[bool]):
                 - True: only the specific manually assigned coupon
                 - False: only generated coupons
                 - None: all coupons
