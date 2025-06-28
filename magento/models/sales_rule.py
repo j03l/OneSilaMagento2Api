@@ -3,6 +3,7 @@ from typing import TYPE_CHECKING, List, Optional
 
 if TYPE_CHECKING:
     from magento import Client
+    from magento.models.coupon import Coupon
 
 from . import ImmutableModel
 
@@ -54,4 +55,4 @@ class SalesRule(ImmutableModel):
         Returns:
             List[Coupon]: the coupon objects.
         """
-        return self.client.coupons.list_for_rule(self.rule_id, primary_only=primary_only)
+        return self.client.coupons.list_for_rule(self.id, primary_only=primary_only)

@@ -64,3 +64,15 @@ class SalesRuleManager(Manager):
             return self.execute_search() or []
         finally:
             self.endpoint = original
+
+    def all_in_memory(self) -> list[SalesRule]:
+        """Fetch all sales rules across all pages.
+        
+        Override to use the correct search endpoint for pagination.
+        """
+        original = self.endpoint
+        try:
+            self.endpoint = f"{original}/search"
+            return super().all_in_memory()
+        finally:
+            self.endpoint = original
