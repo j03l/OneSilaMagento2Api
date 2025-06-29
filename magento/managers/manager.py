@@ -499,6 +499,17 @@ class Manager:
             if not hasattr(instance, k):
                 setattr(instance, k, v)
 
+        for k, v in instance.mutable_initial_values.items():
+            if k == 'custom_attributes' and isinstance(v, list):
+                instance.mutable_data[k] = v
+            elif k == 'custom_attributes' and isinstance(v, dict):
+                instance.mutable_data[k] = [
+                    {'attribute_code': attr_code, 'value': attr_value}
+                    for attr_code, attr_value in v.items()
+                ]
+            else:
+                instance.mutable_data[k] = v
+
         # Now, instance.mutable_data contains the full payload for creation
         mutable_data = instance.mutable_data
 
@@ -539,6 +550,7 @@ class Manager:
         # for the models that use skeleton we need to set it on the root
         if 'skeleton_id' in mutable_data:
             payload['skeletonId'] = mutable_data.pop('skeleton_id')
+
 
         # Send the POST request to create the instance
         url = self.client.url_for(self.create_endpoint, scope=scope)

@@ -79,6 +79,7 @@ class Product(Model):
             'meta_keyword',
             'meta_description',
             'url_key',
+            'custom_attributes',
         ]
 
     @property
@@ -518,6 +519,50 @@ class Product(Model):
                 self.mutable_data['custom_attributes'].append({'attribute_code': 'url_key', 'value': value})
 
             self._update_internal_custom_attribute('url_key', value)
+
+    def __getattr__(self, name: str):
+        """Dynamic attribute access for custom attributes."""
+        if hasattr(self, 'custom_attributes') and self.custom_attributes:
+            if name in self.custom_attributes:
+                return self.custom_attributes[name]
+        
+        raise AttributeError(f"'{self.__class__.__name__}' object has no attribute '{name}'")
+
+    def __setattr__(self, name: str, value):
+        """Dynamic attribute setting for custom attributes."""
+        standard_fields = {
+            'data', 'client', 'endpoint', 'logger', 'mutable_data', 'mutable_initial_values',
+            '_fetched', 'list_endpoint', 'sku', 'name', 'price', 'status', 'visibility',
+            'type_id', 'attribute_set_id', 'custom_attributes', 'extension_attributes'
+        }
+        
+        if name.startswith('_') or name in standard_fields or hasattr(type(self), name):
+            super().__setattr__(name, value)
+            return
+        
+        if hasattr(self, 'mutable_keys') and name in self.mutable_keys:
+            if not hasattr(self, 'mutable_data'):
+                super().__setattr__(name, value)
+                return
+                
+            self.mutable_data.setdefault('custom_attributes', [])
+            
+            for attr in self.mutable_data['custom_attributes']:
+                if attr.get('attribute_code') == name:
+                    attr['value'] = value
+                    break
+            else:
+                self.mutable_data['custom_attributes'].append({
+                    'attribute_code': name,
+                    'value': value
+                })
+            
+            if hasattr(self, '_update_internal_custom_attribute'):
+                self._update_internal_custom_attribute(name, value)
+            
+            super().__setattr__(name, value)
+        else:
+            super().__setattr__(name, value)
 
     @views.setter
     @set_private_attr_after_setter

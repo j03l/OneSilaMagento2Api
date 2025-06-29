@@ -115,16 +115,15 @@ class Model(ABC):
                 if attrs := data[key]:
                     value = self.unpack_attributes(attrs)
 
-                    # Store the packed attributes in mutable_initial_values
-                    # @TODO: Think of a better way to do this! Maybe not in the Model but in the Product
-                    # or convert this whole if from key == 'custom_attributes' where we can unpack things based on a config but still get the mutable
-                    # mutable_initial_values
-                    for attr in attrs:
-                        if attr['attribute_code'] in self.mutable_keys:
-                            self.mutable_initial_values[attr['attribute_code']] = {
-                                'attribute_code': attr['attribute_code'],
-                                'value': attr['value']
-                            }
+                    if 'custom_attributes' in self.mutable_keys:
+                        self.mutable_initial_values['custom_attributes'] = attrs
+                    else:
+                        for attr in attrs:
+                            if attr['attribute_code'] in self.mutable_keys:
+                                self.mutable_initial_values[attr['attribute_code']] = {
+                                    'attribute_code': attr['attribute_code'],
+                                    'value': attr['value']
+                                }
             else:
                 value = data[key]
 
