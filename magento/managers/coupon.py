@@ -492,4 +492,19 @@ class CouponManager(Manager):
         if 'code' not in data:
             data['code'] = identifier
         return self.create(data=data, scope=scope)
+
+    def all_in_memory(self) -> List[Coupon]:
+        """Fetch all coupons across all pages.
+        
+        Override to use the correct search endpoint for pagination.
+        """
+        original_endpoint = self.endpoint
+        original_query = self.query
+        try:
+            self.endpoint = f"{original_endpoint}/search"
+            self.query = self.client.url_for(self.endpoint) + '/?'
+            return super().all_in_memory()
+        finally:
+            self.endpoint = original_endpoint
+            self.query = original_query
     
