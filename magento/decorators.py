@@ -2,6 +2,7 @@ from json import JSONDecodeError
 from magento.constants import ModelMethod
 from functools import wraps
 from time import sleep
+import time
 
 def jsondecode_error_retry(tries=4, delay=3, backoff=2):
     """Retry calling the decorated function using an exponential backoff.
@@ -87,3 +88,32 @@ def set_private_attr_after_setter(func):
         return result
 
     return wrapper
+
+
+def retry_deadlocks(max_retries=5, base_delay=1.0):
+    """Retry decorated function when a database deadlock is detected."""
+
+    def decorator(func):
+        @wraps(func)
+        def wrapper(*args, **kwargs):
+            for attempt in range(max_retries + 1):
+                try:
+                    return func(*args, **kwargs)
+                except Exception as e:
+                    if any(
+                        msg in str(e) for msg in (
+                            "Deadlock found",
+                            "Database deadlock",
+                            "Database lock",
+                        )
+                    ):
+                        if attempt == max_retries:
+                            raise
+                        delay = base_delay * (2 ** attempt)
+                        time.sleep(delay)
+                        continue
+                    raise
+
+        return wrapper
+
+    return decorator
