@@ -9,7 +9,7 @@ from requests.adapters import HTTPAdapter
 from urllib3 import Retry
 
 from .constants import Scope, StoreCode, AuthenticationMethod
-from .decorators import jsondecode_error_retry
+from .decorators import jsondecode_error_retry, retry_deadlocks
 from .managers.attribute_set import AttributeSetManager
 from .managers.product import ProductAttributeOptionManager, MediaEntryManager
 from .managers.tax import TaxClassManager
@@ -404,6 +404,7 @@ class Client:
             raise AuthenticationError(self, msg=msg, response=response)
 
     @jsondecode_error_retry()
+    @retry_deadlocks()
     def request(self, method: str, url: str, payload: dict = None) -> requests.Response:
         """Sends an authorized API request. Used for all internal requests
 
